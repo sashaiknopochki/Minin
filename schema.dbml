@@ -1,0 +1,83 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+// Language Learning Application Database Schema
+
+Table users {
+  id integer [primary key]
+  email varchar [note: 'from Google OAuth']
+  name varchar [note: 'from Google OAuth']
+  google_id varchar [unique, note: 'unique identifier from Google']
+  primary_language_id integer [ref: > languages.id, note: 'nullable']
+  created_at timestamp
+  last_login_at timestamp
+  settings_json json [note: 'quiz frequency, etc.']
+}
+
+Table languages {
+  id integer [primary key]
+  code varchar [note: 'e.g., en, de, ru']
+  name varchar [note: 'e.g., English, German, Russian']
+  flag_emoji varchar [note: '🇬🇧, 🇩🇪, 🇷🇺']
+}
+
+Table phrases {
+  id integer [primary key]
+  text varchar [note: 'the word or phrase']
+  language_id integer [not null, ref: > languages.id]
+  type varchar [note: 'word, phrase, phrasal_verb']
+  created_at timestamp
+
+  indexes {
+    (text, language_id) [unique]
+  }
+}
+
+Table user_searches {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  phrase_id integer [not null, ref: > phrases.id]
+  searched_at timestamp
+  session_id uuid [note: 'UUID to group searches in same session']
+  llm_translations_json json [note: 'cache the LLM response with all translations']
+}
+
+Table user_learning_progress {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  phrase_id integer [not null, ref: > phrases.id]
+  learning_stage varchar [note: 'new, recognition, production, mastered']
+  repetition_count integer [note: 'how many times reviewed']
+  ease_factor decimal [note: '2.5 default, adjusts based on difficulty']
+  interval_days integer [note: 'current interval for spaced repetition']
+  next_review_date date
+  last_reviewed_at timestamp
+  created_at timestamp
+
+  indexes {
+    (user_id, phrase_id) [unique]
+  }
+}
+
+Table quiz_attempts {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  phrase_id integer [not null, ref: > phrases.id]
+  quiz_language_id integer [not null, ref: > languages.id, note: 'the language they answered in']
+  quiz_type varchar [note: 'multiple_choice, text_input']
+  prompt_json json [note: 'what was shown to user']
+  correct_answer varchar [note: 'what LLM considered correct']
+  user_answer varchar
+  was_correct boolean
+  llm_evaluation_json json [note: 'store LLM evaluation for debugging']
+  attempted_at timestamp
+}
+
+Table user_sessions {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  session_id uuid
+  languages_json json [note: 'array of language codes used in session']
+  started_at timestamp
+  ended_at timestamp
+}
