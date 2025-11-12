@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Minin{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h2 class="text-3xl font-bold mb-4">Settings</h2>
+
+    <div class="bg-white p-6 rounded-lg shadow">
+        <form id="settings-form">
+            <div class="mb-4">
+                <label for="primary-language" class="block font-bold mb-2">Primary Language</label>
+                <select id="primary-language" name="primary_language" class="border rounded p-2 w-full">
+                    <!-- Languages will be populated here -->
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label for="quiz-frequency" class="block font-bold mb-2">Quiz Frequency (every N words)</label>
+                <input type="number" id="quiz-frequency" name="quiz_frequency" min="1" class="border rounded p-2 w-full">
+            </div>
+
+            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
+                Save Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

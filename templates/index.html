@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Minin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-3xl font-bold mb-4">Welcome to Minin</h2>
+    <p class="text-gray-600 mb-6">Learn languages smarter with intelligent translation and spaced repetition quizzes.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-blue-100 p-6 rounded-lg">
+            <h3 class="text-xl font-bold mb-2">🔤 Translate</h3>
+            <p>Translate words and phrases across multiple languages simultaneously.</p>
+        </div>
+        <div class="bg-green-100 p-6 rounded-lg">
+            <h3 class="text-xl font-bold mb-2">📚 Learn</h3>
+            <p>Practice with intelligent quizzes using spaced repetition.</p>
+        </div>
+        <div class="bg-purple-100 p-6 rounded-lg">
+            <h3 class="text-xl font-bold mb-2">📈 Progress</h3>
+            <p>Track your vocabulary growth and learning progress.</p>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        <a href="/translate" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Start Translating</a>
+    </div>
+</div>
+{% endblock %}

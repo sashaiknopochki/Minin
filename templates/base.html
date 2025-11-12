@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Minin - Translation & Vocabulary Learning{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Minin</h1>
+            <ul class="flex gap-4">
+                <li><a href="/" class="hover:underline">Home</a></li>
+                <li><a href="/translate" class="hover:underline">Translate</a></li>
+                <li><a href="/practice" class="hover:underline">Practice</a></li>
+                <li><a href="/settings" class="hover:underline">Settings</a></li>
+                <li><a href="/logout" class="hover:underline">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} mb-4">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-gray-100 p-4 mt-8">
+        <div class="container mx-auto text-center text-gray-600">
+            <p>&copy; 2024 Minin. A language learning app.</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
