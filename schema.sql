@@ -1,67 +1,109 @@
--- Core Tables --
+// Translator Web App Database Schema
 
-users
-- id (PRIMARY KEY)
-- email (from Google OAuth)
-- name (from Google OAuth)
-- google_id (unique identifier from Google)
-- primary_language_id (FOREIGN KEY → languages.id, nullable)
-- created_at
-- last_login_at
-- settings_json (quiz frequency, etc.)
+// Reference: ISO 639-1 language codes, spaced repetition for vocabulary learning
 
-languages
-- id (PRIMARY KEY)
-- code (e.g., 'en', 'de', 'ru')
-- name (e.g., 'English', 'German', 'Russian')
-- flag_emoji (🇬🇧, 🇩🇪, 🇷🇺)
+Table users {
+  id integer [primary key]
+  google_id varchar [unique, not null, note: 'Google OAuth identifier']
+  email varchar [not null]
+  name varchar
+  primary_language_code varchar(2) [ref: > languages.code, note: 'language for quiz responses']
+  translator_languages json [note: 'array of language codes e.g. ["en", "de", "ru"]']
+  quiz_frequency integer [default: 5, note: 'ask quiz every N words']
+  quiz_mode_enabled boolean [default: true]
+  searches_since_last_quiz integer [default: 0]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  last_active_at timestamp
+}
 
-phrases  -- renamed from 'words' to handle both words and phrases
-- id (PRIMARY KEY)
-- text (the word or phrase)
-- language_id (FOREIGN KEY → languages.id)
-- type ('word', 'phrase', 'phrasal_verb')
-- created_at
-- UNIQUE(text, language_id)
+Table languages {
+  code varchar(2) [primary key, note: 'ISO 639-1 codes: en, de, ru, etc.']
+  original_name varchar [not null, note: 'Русский, Deutsch, English']
+  en_name varchar [not null, note: 'Russian, German, English']
+  display_order integer [note: 'NULL for most, 1,2,3 for popular languages']
+}
 
-user_searches
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY → users.id)
-- phrase_id (FOREIGN KEY → phrases.id)
-- searched_at
-- session_id (UUID to group searches in same session)
-- llm_translations_json (cache the LLM response with all translations)
+Table phrases {
+  id integer [primary key]
+  text varchar [not null]
+  language_code varchar(2) [not null, ref: > languages.code]
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+  type varchar [note: 'word, phrase, phrasal_verb, example_sentence']
+  is_quizzable boolean [default: true]
 
-user_learning_progress
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY → users.id)
-- phrase_id (FOREIGN KEY → phrases.id)
-- learning_stage ('new', 'recognition', 'production', 'mastered')
-- repetition_count (how many times reviewed)
-- ease_factor (2.5 default, adjusts based on difficulty)
-- interval_days (current interval for spaced repetition)
-- next_review_date
-- last_reviewed_at
-- created_at
-- UNIQUE(user_id, phrase_id)
+  indexes {
+    (text, language_code) [unique]
+  }
+}
 
-quiz_attempts
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY → users.id)
-- phrase_id (FOREIGN KEY → phrases.id)
-- quiz_language_id (FOREIGN KEY → languages.id, the language they answered in)
-- quiz_type ('multiple_choice', 'text_input')
-- prompt_json (what was shown to user)
-- correct_answer (what LLM considered correct)
-- user_answer
-- was_correct (boolean)
-- llm_evaluation_json (store LLM's evaluation for debugging)
-- attempted_at
+Table user_searches {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  phrase_id integer [not null, ref: > phrases.id]
+  searched_at timestamp [default: 'CURRENT_TIMESTAMP']
+  session_id uuid [ref: > sessions.session_id, note: 'UUID for grouping searches in same session']
+  context_sentence text [note: 'optional: where user saw the word']
+  llm_translations_json json [note: 'cache of all translations e.g. {"en": "cat", "de": "Katze", "ru": "кошка"}']
 
-user_sessions
-- id (PRIMARY KEY)
-- user_id (FOREIGN KEY → users.id)
-- session_id (UUID)
-- languages_json (array of language codes used in session)
-- started_at
-- ended_at
+  indexes {
+    user_id
+    phrase_id
+    session_id
+  }
+}
+
+Table user_learning_progress {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  phrase_id integer [not null, ref: > phrases.id]
+  stage varchar [note: 'new, recognition, production, mastered']
+  times_reviewed integer [default: 0]
+  times_correct integer [default: 0]
+  times_incorrect integer [default: 0]
+  next_review_date date
+  last_reviewed_at timestamp
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+
+  indexes {
+    (user_id, phrase_id) [unique]
+    (user_id, next_review_date)
+  }
+}
+
+Table quiz_attempts {
+  id integer [primary key]
+  user_id integer [not null, ref: > users.id]
+  phrase_id integer [not null, ref: > phrases.id]
+  question_type varchar [note: 'multiple_choice_target, multiple_choice_source, text_input_target, text_input_source, contextual, definition, synonym']
+  prompt_json json [note: 'what was shown to user e.g. {"question": "Translate: Katze", "options": [...]}']
+  correct_answer varchar [note: 'what the system considered correct']
+  user_answer varchar
+  was_correct boolean [not null]
+  llm_evaluation_json json [note: 'optional: store LLM evaluation for debugging']
+  attempted_at timestamp [default: 'CURRENT_TIMESTAMP']
+
+  indexes {
+    user_id
+  }
+}
+
+Table phrase_translations {
+  id integer [primary key]
+  phrase_id integer [not null, ref: > phrases.id]
+  translations_json json [note: 'LLM response: definitions, examples, synonyms']
+  model_name varchar [note: 'e.g., gpt-4o, claude-3.5-sonnet, gemini-1.5-pro']
+  model_version varchar [note: 'e.g., 2024-11-01, specific version identifier']
+  prompt_hash varchar [note: 'optional: hash of the prompt used']
+  created_at timestamp [default: 'CURRENT_TIMESTAMP']
+
+  indexes {
+    phrase_id [unique]
+  }
+}
+
+Table sessions {
+  session_id uuid [primary key]
+  user_id integer [not null, ref: > users.id]
+  started_at timestamp
+  ended_at timestamp
+}
