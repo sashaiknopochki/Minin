@@ -1,20 +1,40 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-
-app = Flask(__name__)
-
-# Configure SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Initialize SQLAlchemy
-db = SQLAlchemy(app)
+from flask import Flask, jsonify
+from config import config
+import os
 
 
-@app.route('/')
-def home():
-    return 'Welcome to Minin App!'
+def create_app(config_name=None):
+    """Application factory pattern"""
+    if config_name is None:
+        config_name = os.getenv('FLASK_ENV', 'development')
+
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+
+    # Register blueprints
+    from routes.auth import bp as auth_bp
+    from routes.translation import bp as translation_bp
+    from routes.quiz import bp as quiz_bp
+    from routes.progress import bp as progress_bp
+    from routes.settings import bp as settings_bp
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(translation_bp)
+    app.register_blueprint(quiz_bp)
+    app.register_blueprint(progress_bp)
+    app.register_blueprint(settings_bp)
+
+    # Home route
+    @app.route('/')
+    def home():
+        return jsonify({
+            'message': 'Welcome to Minin App!',
+            'version': '1.0.0'
+        })
+
+    return app
 
 
 if __name__ == '__main__':
+    app = create_app()
     app.run(debug=True)
