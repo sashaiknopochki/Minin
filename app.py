@@ -13,7 +13,7 @@ db = SQLAlchemy(app)
 
 @app.route('/')
 def home():
-    return 'Welcome to the Flask SQLAlchemy App!'
+    return 'Welcome to Minin App!'
 
 
 if __name__ == '__main__':
