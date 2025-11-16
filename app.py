@@ -11,6 +11,20 @@ def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
+    # Initialize SQLAlchemy
+    from models import db
+    db.init_app(app)
+
+    # Import all models to ensure they are registered with SQLAlchemy
+    from models.language import Language
+    from models.user import User
+    from models.phrase import Phrase
+    from models.session import Session
+    from models.user_searches import UserSearch
+    from models.phrase_translation import PhraseTranslation
+    from models.user_learning_progress import UserLearningProgress
+    from models.quiz_attempt import QuizAttempt
+
     # Register blueprints
     from routes.auth import bp as auth_bp
     from routes.translation import bp as translation_bp

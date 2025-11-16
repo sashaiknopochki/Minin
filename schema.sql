@@ -99,6 +99,7 @@ Table phrase_translations {
   indexes {
     phrase_id [unique]
   }
+
 }
 
 Table sessions {

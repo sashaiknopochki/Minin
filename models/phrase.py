@@ -1,0 +1,34 @@
+from models import db
+from datetime import datetime
+
+
+class Phrase(db.Model):
+    """Phrase model - stores words, phrases, phrasal verbs, and example sentences"""
+    __tablename__ = 'phrases'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    text = db.Column(db.String, nullable=False)
+    language_code = db.Column(db.String(2), db.ForeignKey('languages.code'), nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # word, phrase, phrasal_verb, example_sentence
+    type = db.Column(db.String)
+
+    is_quizzable = db.Column(db.Boolean, default=True)
+
+    # Relationships
+    language = db.relationship('Language')
+    user_searches = db.relationship('UserSearch', back_populates='phrase', lazy='dynamic')
+    learning_progress = db.relationship('UserLearningProgress', back_populates='phrase', lazy='dynamic')
+    quiz_attempts = db.relationship('QuizAttempt', back_populates='phrase', lazy='dynamic')
+    translations = db.relationship('PhraseTranslation', back_populates='phrase', lazy='dynamic')
+
+    # Unique constraint on (text, language_code)
+    __table_args__ = (
+        db.UniqueConstraint('text', 'language_code', name='uq_phrase_text_language'),
+    )
+
+    def __repr__(self):
+        return f'<Phrase {self.text} ({self.language_code})>'
