@@ -90,6 +90,7 @@ Table quiz_attempts {
 Table phrase_translations {
   id integer [primary key]
   phrase_id integer [not null, ref: > phrases.id]
+  target_language_code varchar [not null, ref: > languages.code]
   translations_json json [note: 'LLM response: definitions, examples, synonyms']
   model_name varchar [note: 'e.g., gpt-4o, claude-3.5-sonnet, gemini-1.5-pro']
   model_version varchar [note: 'e.g., 2024-11-01, specific version identifier']
