@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app import create_app
 from models import db
 from models.user import User
@@ -10,7 +16,6 @@ from models.quiz_attempt import QuizAttempt
 from models.session import Session
 from uuid import uuid4
 from datetime import datetime
-import os
 
 # Create app with test configuration
 app = create_app('development')

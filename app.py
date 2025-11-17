@@ -42,13 +42,11 @@ def create_app(config_name=None):
     app.register_blueprint(google_bp, url_prefix='/login')
 
     # Register API blueprints
-    from routes.auth import bp as auth_bp
     from routes.translation import bp as translation_bp
     from routes.quiz import bp as quiz_bp
     from routes.progress import bp as progress_bp
     from routes.settings import bp as settings_bp
 
-    app.register_blueprint(auth_bp)
     app.register_blueprint(translation_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(progress_bp)
