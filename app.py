@@ -1,4 +1,5 @@
 from flask import Flask, jsonify
+from flask_login import LoginManager
 from config import config
 import os
 
@@ -15,6 +16,11 @@ def create_app(config_name=None):
     from models import db
     db.init_app(app)
 
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.google_login'
+
     # Import all models to ensure they are registered with SQLAlchemy
     from models.language import Language
     from models.user import User
@@ -25,7 +31,17 @@ def create_app(config_name=None):
     from models.user_learning_progress import UserLearningProgress
     from models.quiz_attempt import QuizAttempt
 
-    # Register blueprints
+    # User loader callback for Flask-Login
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+
+    # Register OAuth blueprints
+    from auth.oauth import bp as oauth_bp, google_bp
+    app.register_blueprint(oauth_bp)
+    app.register_blueprint(google_bp, url_prefix='/login')
+
+    # Register API blueprints
     from routes.auth import bp as auth_bp
     from routes.translation import bp as translation_bp
     from routes.quiz import bp as quiz_bp

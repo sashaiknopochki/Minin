@@ -1,8 +1,9 @@
 from models import db
 from datetime import datetime
+from flask_login import UserMixin
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     """User model - stores user information and preferences"""
     __tablename__ = 'users'
 
