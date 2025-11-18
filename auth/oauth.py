@@ -10,10 +10,20 @@ logger = logging.getLogger(__name__)
 # Create OAuth blueprint
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
+# Validate OAuth credentials exist
+_google_client_id = os.getenv('GOOGLE_CLIENT_ID')
+_google_client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+
+if not _google_client_id or not _google_client_secret:
+    logger.warning(
+        'Google OAuth credentials not configured. '
+        'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.'
+    )
+
 # Create Google OAuth blueprint
 google_bp = make_google_blueprint(
-    client_id=os.getenv('GOOGLE_CLIENT_ID'),
-    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
+    client_id=_google_client_id,
+    client_secret=_google_client_secret,
     scope=['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile'],
     redirect_url='/auth/google/callback'
 )
@@ -33,20 +43,24 @@ def google_login():
 def google_callback():
     """Handle Google OAuth callback"""
     if not google.authorized:
-        logger.warning('OAuth callback received but user not authorized')
+        logger.warning(
+            'OAuth callback received but user not authorized. '
+            'Possible causes: user denied access, session expired, or state mismatch.'
+        )
         flash('Failed to log in with Google. Please try again.', 'error')
-        # 401 Unauthorized
-        return redirect(url_for('home'), code=302)
+        return redirect(url_for('home'))
 
     # Get user info from Google
     try:
         resp = google.get('/oauth2/v2/userinfo')
 
         if not resp.ok:
-            logger.error(f'Failed to fetch user info from Google. Status: {resp.status_code}')
+            logger.error(
+                f'Failed to fetch user info from Google. '
+                f'Status: {resp.status_code}, Response: {resp.text[:200] if resp.text else "empty"}'
+            )
             flash('Failed to fetch user info from Google. Please try again.', 'error')
-            # 401 Unauthorized - couldn't get user info
-            return redirect(url_for('home'), code=302)
+            return redirect(url_for('home'))
 
         google_info = resp.json()
         google_id = google_info.get('id')
@@ -54,10 +68,12 @@ def google_callback():
         name = google_info.get('name', '')
 
         if not google_id or not email:
-            logger.error('Incomplete user info received from Google')
+            logger.error(
+                f'Incomplete user info received from Google. '
+                f'google_id: {google_id is not None}, email: {email is not None}'
+            )
             flash('Failed to retrieve complete user information from Google.', 'error')
-            # 400 Bad Request - incomplete data
-            return redirect(url_for('home'), code=302)
+            return redirect(url_for('home'))
 
         # Import here to avoid circular imports
         from auth.utils import get_or_create_user
@@ -66,24 +82,21 @@ def google_callback():
         user = get_or_create_user(google_id, email, name)
 
         if not user:
-            logger.error(f'Failed to create/retrieve user for google_id: {google_id}')
+            logger.error(f'Failed to create/retrieve user for google_id: {google_id}, email: {email}')
             flash('Failed to create user account. Please contact support.', 'error')
-            # 500 Internal Server Error - database issue
-            return redirect(url_for('home'), code=302)
+            return redirect(url_for('home'))
 
         # Log in the user
         login_user(user)
         logger.info(f'User {email} logged in successfully')
         flash('Successfully logged in!', 'success')
 
-        # 302 Found - standard redirect after successful login
-        return redirect(url_for('home'), code=302)
+        return redirect(url_for('home'))
 
     except Exception as e:
         logger.exception(f'Exception during Google OAuth callback: {str(e)}')
         flash('An unexpected error occurred during login. Please try again.', 'error')
-        # 500 Internal Server Error
-        return redirect(url_for('home'), code=302)
+        return redirect(url_for('home'))
 
 
 @bp.route('/logout')

@@ -2,6 +2,9 @@ from models import db
 from models.user import User
 from flask_login import current_user
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_user(google_id, email, name):
@@ -14,34 +17,41 @@ def get_or_create_user(google_id, email, name):
         name: User's name from Google
 
     Returns:
-        User object
+        User object or None if database operation fails
     """
-    # Check if user already exists
-    user = User.query.filter_by(google_id=google_id).first()
+    try:
+        # Check if user already exists
+        user = User.query.filter_by(google_id=google_id).first()
 
-    if user:
-        # Update last active timestamp
-        user.last_active_at = datetime.utcnow()
+        if user:
+            # Update last active timestamp
+            user.last_active_at = datetime.utcnow()
+            db.session.commit()
+            return user
+
+        # Create new user with default settings
+        user = User(
+            google_id=google_id,
+            email=email,
+            name=name,
+            primary_language_code='ru',  # Default to Russian
+            translator_languages=['de', 'en', 'ru'],  # Default languages
+            quiz_frequency=5,  # Default quiz frequency
+            quiz_mode_enabled=True,
+            searches_since_last_quiz=0,
+            last_active_at=datetime.utcnow()
+        )
+
+        db.session.add(user)
         db.session.commit()
+
+        logger.info(f'Created new user: {email}')
         return user
 
-    # Create new user with default settings
-    user = User(
-        google_id=google_id,
-        email=email,
-        name=name,
-        primary_language_code='ru',  # Default to Russian
-        translator_languages=['de', 'en', 'ru'],  # Default languages
-        quiz_frequency=5,  # Default quiz frequency
-        quiz_mode_enabled=True,
-        searches_since_last_quiz=0,
-        last_active_at=datetime.utcnow()
-    )
-
-    db.session.add(user)
-    db.session.commit()
-
-    return user
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to create/update user {email}: {str(e)}')
+        return None
 
 
 def is_authenticated():
