@@ -23,6 +23,9 @@ class UserLearningProgress(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Track when user first encountered this phrase (for velocity calculation)
+    first_seen_at = db.Column(db.DateTime, default=datetime.utcnow)
+
     # Relationships
     user = db.relationship('User', back_populates='learning_progress')
     phrase = db.relationship('Phrase', back_populates='learning_progress')
@@ -32,6 +35,21 @@ class UserLearningProgress(db.Model):
         db.UniqueConstraint('user_id', 'phrase_id', name='uq_user_phrase'),
         db.Index('idx_user_next_review', 'user_id', 'next_review_date'),
     )
+
+    @property
+    def accuracy_percentage(self):
+        """Calculate accuracy as percentage of correct answers"""
+        if self.times_reviewed == 0:
+            return 0.0
+        return (self.times_correct / self.times_reviewed) * 100
+
+    @property
+    def days_to_learn(self):
+        """Calculate days from first seen to current stage (velocity metric)"""
+        if not self.first_seen_at:
+            return None
+        delta = datetime.utcnow() - self.first_seen_at
+        return delta.days
 
     def __repr__(self):
         return f'<UserLearningProgress user_id={self.user_id} phrase_id={self.phrase_id} stage={self.stage}>'

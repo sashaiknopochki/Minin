@@ -15,9 +15,12 @@ class Phrase(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # word, phrase, phrasal_verb, example_sentence
-    type = db.Column(db.String)
+    type = db.Column(db.String, default='word')
 
     is_quizzable = db.Column(db.Boolean, default=True)
+
+    # Analytics: track how many times this phrase has been searched
+    search_count = db.Column(db.Integer, default=0)
 
     # Relationships
     language = db.relationship('Language')
@@ -35,7 +38,8 @@ class Phrase(db.Model):
     def validate_text(self, key, text):
         if not text or not text.strip():
             raise ValueError('Phrase text cannot be empty or whitespace')
-        return text.strip()
+        # Normalize: strip whitespace and convert to lowercase to prevent duplicates
+        return text.strip().lower()
 
     def __repr__(self):
         return f'<Phrase {self.text} ({self.language_code})>'

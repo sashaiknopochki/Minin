@@ -14,8 +14,8 @@ class Language(db.Model):
     # Russian, German, English
     en_name = db.Column(db.String, nullable=False)
 
-    # NULL for most, 1,2,3 for popular languages
-    display_order = db.Column(db.Integer)
+    # 1,2,3 for popular languages, 999 default for others (sorts last)
+    display_order = db.Column(db.Integer, default=999)
 
     def __repr__(self):
         return f'<Language {self.code} - {self.en_name}>'

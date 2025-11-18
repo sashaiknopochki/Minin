@@ -26,6 +26,11 @@ class PhraseTranslation(db.Model):
     prompt_hash = db.Column(db.String)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+
+    # User feedback for quality tracking
+    helpful_count = db.Column(db.Integer, default=0)
+    unhelpful_count = db.Column(db.Integer, default=0)
 
     # Relationships
     phrase = db.relationship('Phrase', back_populates='translations')
