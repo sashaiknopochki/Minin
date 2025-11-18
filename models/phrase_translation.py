@@ -14,10 +14,10 @@ class PhraseTranslation(db.Model):
     target_language_code = db.Column(db.String(2), db.ForeignKey('languages.code'), nullable=False)
 
     # LLM response: definitions, examples, synonyms
-    translations_json = db.Column(db.JSON)
+    translations_json = db.Column(db.JSON, nullable=False)
 
     # e.g., gpt-4o, claude-3.5-sonnet, gemini-1.5-pro
-    model_name = db.Column(db.String)
+    model_name = db.Column(db.String, nullable=False)
 
     # e.g., 2024-11-01, specific version identifier
     model_version = db.Column(db.String)

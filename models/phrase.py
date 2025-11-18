@@ -1,5 +1,6 @@
 from models import db
 from datetime import datetime
+from sqlalchemy.orm import validates
 
 
 class Phrase(db.Model):
@@ -9,7 +10,7 @@ class Phrase(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     text = db.Column(db.String, nullable=False)
-    language_code = db.Column(db.String(2), db.ForeignKey('languages.code'), nullable=False)
+    language_code = db.Column(db.String(2), db.ForeignKey('languages.code'), nullable=False, index=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -29,6 +30,12 @@ class Phrase(db.Model):
     __table_args__ = (
         db.UniqueConstraint('text', 'language_code', name='uq_phrase_text_language'),
     )
+
+    @validates('text')
+    def validate_text(self, key, text):
+        if not text or not text.strip():
+            raise ValueError('Phrase text cannot be empty or whitespace')
+        return text.strip()
 
     def __repr__(self):
         return f'<Phrase {self.text} ({self.language_code})>'

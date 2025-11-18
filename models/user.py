@@ -1,6 +1,8 @@
 from models import db
 from datetime import datetime
 from flask_login import UserMixin
+from sqlalchemy.orm import validates
+import re
 
 
 class User(UserMixin, db.Model):
@@ -12,7 +14,7 @@ class User(UserMixin, db.Model):
     # Google OAuth identifier
     google_id = db.Column(db.String, unique=True, nullable=False)
 
-    email = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, nullable=False, index=True)
     name = db.Column(db.String)
 
     # Language for quiz responses
@@ -36,6 +38,33 @@ class User(UserMixin, db.Model):
     user_searches = db.relationship('UserSearch', back_populates='user', lazy='dynamic')
     learning_progress = db.relationship('UserLearningProgress', back_populates='user', lazy='dynamic')
     quiz_attempts = db.relationship('QuizAttempt', back_populates='user', lazy='dynamic')
+
+    @validates('email')
+    def validate_email(self, key, email):
+        if not email:
+            raise ValueError('Email is required')
+        # Basic email format validation
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, email):
+            raise ValueError(f'Invalid email format: {email}')
+        return email
+
+    @validates('quiz_frequency')
+    def validate_quiz_frequency(self, key, value):
+        if value is not None and value < 1:
+            raise ValueError('quiz_frequency must be a positive integer')
+        return value
+
+    @validates('translator_languages')
+    def validate_translator_languages(self, key, languages):
+        if languages is None:
+            return languages
+        if not isinstance(languages, list):
+            raise ValueError('translator_languages must be a list')
+        for lang in languages:
+            if not isinstance(lang, str) or len(lang) != 2:
+                raise ValueError(f'Invalid language code: {lang}. Must be 2-character ISO code')
+        return languages
 
     def __repr__(self):
         return f'<User {self.email}>'

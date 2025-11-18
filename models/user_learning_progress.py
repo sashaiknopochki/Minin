@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, date
 
 
 class UserLearningProgress(db.Model):
@@ -12,13 +12,13 @@ class UserLearningProgress(db.Model):
     phrase_id = db.Column(db.Integer, db.ForeignKey('phrases.id'), nullable=False)
 
     # new, recognition, production, mastered
-    stage = db.Column(db.String)
+    stage = db.Column(db.String, nullable=False, default='new')
 
     times_reviewed = db.Column(db.Integer, default=0)
     times_correct = db.Column(db.Integer, default=0)
     times_incorrect = db.Column(db.Integer, default=0)
 
-    next_review_date = db.Column(db.Date)
+    next_review_date = db.Column(db.Date, default=date.today)
     last_reviewed_at = db.Column(db.DateTime)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

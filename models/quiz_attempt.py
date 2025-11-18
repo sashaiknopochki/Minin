@@ -12,7 +12,7 @@ class QuizAttempt(db.Model):
     phrase_id = db.Column(db.Integer, db.ForeignKey('phrases.id'), nullable=False)
 
     # multiple_choice_target, multiple_choice_source, text_input_target, text_input_source, contextual, definition, synonym
-    question_type = db.Column(db.String)
+    question_type = db.Column(db.String, nullable=False)
 
     # What was shown to user e.g. {"question": "Translate: Katze", "options": [...]}
     prompt_json = db.Column(db.JSON)
