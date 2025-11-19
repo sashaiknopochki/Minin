@@ -1,5 +1,6 @@
 from flask import Flask, jsonify
 from flask_login import LoginManager
+from flask_cors import CORS
 from config import config
 import os
 
@@ -11,6 +12,12 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # Initialize CORS for React frontend
+    CORS(app, resources={
+        r"/api/*": {"origins": ["http://localhost:5173"]},
+        r"/auth/*": {"origins": ["http://localhost:5173"]}
+    }, supports_credentials=True)
 
     # Initialize SQLAlchemy
     from models import db
