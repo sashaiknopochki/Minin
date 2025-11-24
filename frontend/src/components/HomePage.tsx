@@ -11,7 +11,7 @@ export default function HomePage() {
         <div className="flex items-baseline justify-between">
           {/* Logo and Navigation */}
           <div className="flex items-baseline gap-4 sm:gap-6 md:gap-10">
-            <h1 className="text-2xl font-bold text-black">minin</h1>
+            <h1 className="text-2xl font-bold text-foreground">minin</h1>
 
             <Tabs defaultValue="translate" className="w-auto">
               <TabsList className="h-auto bg-transparent p-0 gap-1">
