@@ -2,8 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLanguageContext } from "@/contexts/LanguageContext";
 
 export default function HomePage() {
+  const { languages, loading, error } = useLanguageContext();
+
   return (
     <div>
       {/* Header */}
@@ -43,16 +46,20 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Russian Input */}
           <div className="flex flex-col gap-6">
-            <Select defaultValue="russian">
+            <Select defaultValue="ru" disabled={loading}>
               <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder="Select language" />
+                <SelectValue placeholder={loading ? "Loading languages..." : "Select language"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="russian">Russian</SelectItem>
-                <SelectItem value="english">English</SelectItem>
-                <SelectItem value="german">German</SelectItem>
-                <SelectItem value="spanish">Spanish</SelectItem>
-                <SelectItem value="french">French</SelectItem>
+                {error ? (
+                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                ) : (
+                  languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.en_name} ({lang.original_name})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
 
@@ -64,16 +71,20 @@ export default function HomePage() {
 
           {/* English Input */}
           <div className="flex flex-col gap-6">
-            <Select defaultValue="english">
+            <Select defaultValue="en" disabled={loading}>
               <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder="Select language" />
+                <SelectValue placeholder={loading ? "Loading languages..." : "Select language"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="russian">Russian</SelectItem>
-                <SelectItem value="english">English</SelectItem>
-                <SelectItem value="german">German</SelectItem>
-                <SelectItem value="spanish">Spanish</SelectItem>
-                <SelectItem value="french">French</SelectItem>
+                {error ? (
+                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                ) : (
+                  languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.en_name} ({lang.original_name})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
 
@@ -85,16 +96,20 @@ export default function HomePage() {
 
           {/* German Input */}
           <div className="flex flex-col gap-6">
-            <Select defaultValue="german">
+            <Select defaultValue="de" disabled={loading}>
               <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder="Select language" />
+                <SelectValue placeholder={loading ? "Loading languages..." : "Select language"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="russian">Russian</SelectItem>
-                <SelectItem value="english">English</SelectItem>
-                <SelectItem value="german">German</SelectItem>
-                <SelectItem value="spanish">Spanish</SelectItem>
-                <SelectItem value="french">French</SelectItem>
+                {error ? (
+                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                ) : (
+                  languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.en_name} ({lang.original_name})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
 

@@ -49,11 +49,13 @@ def create_app(config_name=None):
     app.register_blueprint(google_bp, url_prefix='/login')
 
     # Register API blueprints
+    from routes.api import bp as api_bp
     from routes.translation import bp as translation_bp
     from routes.quiz import bp as quiz_bp
     from routes.progress import bp as progress_bp
     from routes.settings import bp as settings_bp
 
+    app.register_blueprint(api_bp)
     app.register_blueprint(translation_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(progress_bp)
@@ -72,4 +74,4 @@ def create_app(config_name=None):
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

@@ -14,11 +14,11 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to Flask backend
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5001',
         changeOrigin: true,
       },
       '/auth': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5001',
         changeOrigin: true,
       },
     },
