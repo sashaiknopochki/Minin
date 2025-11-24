@@ -6,13 +6,13 @@ class Language(db.Model):
     __tablename__ = 'languages'
 
     # ISO 639-1 codes: en, de, ru, etc.
-    code = db.Column(db.String(2), primary_key=True)
+    code = db.Column(db.String(10), primary_key=True)
 
     # Русский, Deutsch, English
-    original_name = db.Column(db.String, nullable=False)
+    original_name = db.Column(db.String(30), nullable=False)
 
     # Russian, German, English
-    en_name = db.Column(db.String, nullable=False)
+    en_name = db.Column(db.String(30), nullable=False)
 
     # 1,2,3 for popular languages, 999 default for others (sorts last)
     display_order = db.Column(db.Integer, default=999)
