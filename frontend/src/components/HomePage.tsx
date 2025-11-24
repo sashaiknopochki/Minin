@@ -5,12 +5,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-secondary">
+    <div>
       {/* Header */}
-      <header className="mx-auto max-w-[1280px] px-20 py-3">
+      <header className="w-full py-3">
         <div className="flex items-baseline justify-between">
           {/* Logo and Navigation */}
-          <div className="flex items-baseline gap-10">
+          <div className="flex items-baseline gap-4 sm:gap-6 md:gap-10">
             <h1 className="text-2xl font-bold text-black">minin</h1>
 
             <Tabs defaultValue="translate" className="w-auto">
@@ -39,8 +39,8 @@ export default function HomePage() {
       </header>
 
       {/* Main Content - Language Inputs */}
-      <main className="mx-auto max-w-[1280px] px-20 pt-12">
-        <div className="grid grid-cols-3 gap-8">
+      <main className="w-full pt-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* Russian Input */}
           <div className="flex flex-col gap-6">
             <Select defaultValue="russian">
