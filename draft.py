@@ -13,7 +13,7 @@ GPT_4_1_MINI = "gpt-4.1-mini"
 O4_MINI = "o4-mini"
 
 
-def translate_text(text: str, source_language: str, target_languages: list, model: str) -> dict:
+def translate_text(text: str, source_language: str, target_languages: list, model: str, native_language: str = "English") -> dict:
     """
     Translate text from source language to multiple target languages using OpenAI API.
     Returns all possible meanings/definitions of the word.
@@ -23,6 +23,7 @@ def translate_text(text: str, source_language: str, target_languages: list, mode
         source_language: The source language (e.g., "English", "German", "Spanish")
         target_languages: List of target languages (e.g., ["English", "German", "Spanish"])
         model: The OpenAI model to use (e.g., "gpt-4o-mini", "o4-mini-2025-04-16")
+        native_language: Language for definitions/contexts (default: "English")
 
     Returns:
         Dictionary containing:
@@ -30,6 +31,7 @@ def translate_text(text: str, source_language: str, target_languages: list, mode
         - original_text: str
         - source_language: str
         - target_languages: list
+        - native_language: str
         - translations: dict with language keys and list of meanings
         - model: str
         - usage: token usage stats
@@ -48,30 +50,38 @@ def translate_text(text: str, source_language: str, target_languages: list, mode
     # Create system prompt for translation with multiple meanings
     target_langs_str = ", ".join(target_languages)
     system_prompt = f"""You are a professional translator and linguist.
-    Translate the {source_language} word/phrase "{text}" to the following target languages: {target_langs_str}
+Translate the {source_language} word/phrase "{text}" to the following target languages: {target_langs_str}
 
-    IMPORTANT RULES:
-    1. Do NOT include {source_language} in your translations (since that's the source language)
-    2. Provide ALL possible meanings and definitions for each translation
-    3. Write ALL definitions/contexts in {source_language}, not in the target language
-    4. If multiple meanings translate to the SAME word in the target language, combine them into a single entry with all meanings listed together, separated by commas
+IMPORTANT RULES:
+1. Do NOT include {source_language} in your translations (since that's the source language)
+2. Provide ALL possible meanings and definitions for each translation
+3. Write ALL definitions/contexts in {native_language}, not in the target language
+4. CRITICAL: If multiple meanings translate to the EXACT SAME word in the target language, you MUST combine them into ONE entry with all meanings separated by commas. DO NOT repeat the same word multiple times.
+5. Only include translations that are actually valid in the target language - do not include meanings that don't exist in that language
 
-    Return your response as a JSON object where each key is a target language and the value is an array of translations.
-    Each translation should be an array with two elements: [translation, context/meaning in {source_language}].
+Return your response as a JSON object where each key is a target language and the value is an array of translations.
+Each translation should be an array with two elements: [translation, context/meaning in {native_language}].
 
-    Examples:
+Examples:
 
-    If translating "bank" from English to German (different translations), return:
-    {{
-      "German": [["Bank", "(финансовое учреждение)"], ["Ufer", "(берег реки)"], ["Böschung", "(насыпь)"]]
-    }}
+CORRECT - combining repeated words:
+If translating "собака" from Russian to English (with contexts in Russian):
+{{
+  "English": [["dog", "(домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата)"]]
+}}
 
-    If translating "кровать" from Russian to English (same translation, multiple meanings), return:
-    {{
-      "English": [["bed", "(мебель для сна или отдыха, слой горной породы (геологический термин), дно водоема)"]]
-    }}
+INCORRECT - DO NOT do this:
+{{
+  "English": [["dog", "(домашнее животное)"], ["dog", "(презрительное обозначение)"], ["dog", "(инструмент)"]]
+}}
 
-    Only return the JSON object, nothing else."""
+CORRECT - different words for different meanings:
+If translating "bank" from English to German (with contexts in Russian):
+{{
+  "German": [["Bank", "(финансовое учреждение)"], ["Ufer", "(берег реки)"], ["Böschung", "(насыпь)"]]
+}}
+
+Only return the JSON object, nothing else."""
 
     # Make API call
     try:
@@ -102,6 +112,7 @@ def translate_text(text: str, source_language: str, target_languages: list, mode
             "original_text": text,
             "source_language": source_language,
             "target_languages": target_languages,
+            "native_language": native_language,
             "translations": translations_dict,
             "model": model,
             "usage": {
@@ -117,17 +128,19 @@ def translate_text(text: str, source_language: str, target_languages: list, mode
             "error": str(e),
             "original_text": text,
             "source_language": source_language,
-            "target_languages": target_languages
+            "target_languages": target_languages,
+            "native_language": native_language
         }
 
 
 # CLI testing
 if __name__ == "__main__":
-    result = translate_text("кровать", "Russian", ["English", "German"], GPT_4_1_MINI)
+    result = translate_text("собака", "Russian", ["English", "German"], GPT_4_1_MINI, native_language="Russian")
 
     if result["success"]:
         print(result)
         print(f"\nOriginal ({result['source_language']}): {result['original_text']}")
+        print(f"Native Language (for contexts): {result['native_language']}")
         print(f"Model: {result['model']}")
         print(f"\nTranslations:")
         for lang, meanings in result['translations'].items():
