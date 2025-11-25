@@ -12,7 +12,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+import UserMenu from "@/components/UserMenu";
 import { useLanguageContext } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
 
 interface TranslationResult {
@@ -21,6 +23,7 @@ interface TranslationResult {
 
 export default function HomePage() {
   const { languages, loading: languagesLoading, error: languagesError } = useLanguageContext();
+  const { user, login } = useAuth();
 
   // Track selected language for each input
   const [lang1, setLang1] = useState("ru");
@@ -202,14 +205,20 @@ export default function HomePage() {
   // Handle Google Sign-In success
   const handleGoogleSignIn = async (response: google.accounts.id.CredentialResponse) => {
     try {
-      // TODO: Send the credential to your backend for verification
-      console.log("Google Sign-In successful", response);
-      // You would typically send response.credential to your backend here
-      // const result = await fetch("/auth/google", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ credential: response.credential }),
-      // });
+      const result = await fetch("/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ credential: response.credential }),
+      });
+
+      const data = await result.json();
+
+      if (data.success && data.user) {
+        login(data.user);
+      } else {
+        console.error("Sign-in failed:", data.error);
+      }
     } catch (error) {
       console.error("Sign-in error:", error);
     }
@@ -224,7 +233,7 @@ export default function HomePage() {
     <div>
       {/* Header */}
       <header className="w-full py-3">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-center justify-between">
           {/* Logo and Navigation */}
           <div className="flex items-baseline gap-4 sm:gap-6 md:gap-10">
             <h1 className="text-4xl font-bold text-foreground">minin</h1>
@@ -247,30 +256,34 @@ export default function HomePage() {
             </Tabs>
           </div>
 
-          {/* Sign In Button */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="h-9 px-4 py-2 shadow-sm">
-                Sign In
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-semibold leading-7">
-                  Welcome to Minin
-                </DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground leading-5">
-                  Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-2 w-full">
-                <GoogleSignInButton
-                  onSuccess={handleGoogleSignIn}
-                  onError={handleGoogleSignInError}
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
+          {/* Authentication - Show either Sign In or User Menu */}
+          {user ? (
+            <UserMenu />
+          ) : (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="h-9 px-4 py-2 shadow-sm">
+                  Sign In
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-semibold leading-7">
+                    Welcome to Minin
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground leading-5">
+                    Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-2 w-full">
+                  <GoogleSignInButton
+                    onSuccess={handleGoogleSignIn}
+                    onError={handleGoogleSignInError}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </header>
 

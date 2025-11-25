@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface GoogleSignInButtonProps {
   onSuccess?: (response: google.accounts.id.CredentialResponse) => void;

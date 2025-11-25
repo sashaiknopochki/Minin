@@ -1,6 +1,8 @@
-from flask import Blueprint, redirect, url_for, flash, session
+from flask import Blueprint, redirect, url_for, flash, session, request, jsonify
 from flask_dance.contrib.google import make_google_blueprint, google
 from flask_login import login_user, logout_user, current_user
+from google.oauth2 import id_token
+from google.auth.transport import requests
 import os
 import logging
 
@@ -29,9 +31,91 @@ google_bp = make_google_blueprint(
 )
 
 
-@bp.route('/google')
+@bp.route('/google', methods=['POST'])
+def google_signin():
+    """
+    Handle Google Identity Services (GIS) sign-in.
+    Receives a credential token from the frontend and verifies it.
+    """
+    try:
+        data = request.get_json()
+        credential = data.get('credential')
+
+        if not credential:
+            return jsonify({
+                'success': False,
+                'error': 'No credential provided'
+            }), 400
+
+        # Verify the credential token with Google
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                credential,
+                requests.Request(),
+                _google_client_id
+            )
+
+            # Extract user information
+            google_id = idinfo.get('sub')
+            email = idinfo.get('email')
+            name = idinfo.get('name', '')
+            picture = idinfo.get('picture', '')
+
+            if not google_id or not email:
+                logger.error('Incomplete user info from Google token')
+                return jsonify({
+                    'success': False,
+                    'error': 'Incomplete user information'
+                }), 400
+
+            # Import here to avoid circular imports
+            from auth.utils import get_or_create_user
+
+            # Get or create user
+            user = get_or_create_user(google_id, email, name)
+
+            if not user:
+                logger.error(f'Failed to create/retrieve user for google_id: {google_id}')
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to create user account'
+                }), 500
+
+            # Log in the user with Flask-Login
+            login_user(user, remember=True)
+            logger.info(f'User {email} logged in successfully via GIS')
+
+            return jsonify({
+                'success': True,
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'name': user.name,
+                    'picture': picture,
+                    'primary_language_code': user.primary_language_code,
+                    'translator_languages': user.translator_languages
+                }
+            }), 200
+
+        except ValueError as e:
+            # Invalid token
+            logger.error(f'Invalid Google token: {str(e)}')
+            return jsonify({
+                'success': False,
+                'error': 'Invalid credential token'
+            }), 401
+
+    except Exception as e:
+        logger.exception(f'Exception during Google sign-in: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': 'An unexpected error occurred'
+        }), 500
+
+
+@bp.route('/google/redirect')
 def google_login():
-    """Redirect to Google OAuth login"""
+    """Redirect to Google OAuth login (legacy redirect-based flow)"""
     if not google.authorized:
         # 307 Temporary Redirect - maintains POST method if used
         return redirect(url_for('google.login'), code=307)
@@ -99,9 +183,35 @@ def google_callback():
         return redirect(url_for('home'))
 
 
-@bp.route('/logout')
+@bp.route('/me', methods=['GET'])
+def get_current_user():
+    """
+    Get current authenticated user information.
+    Used by frontend to check auth status and get user data.
+    """
+    if current_user.is_authenticated:
+        return jsonify({
+            'success': True,
+            'authenticated': True,
+            'user': {
+                'id': current_user.id,
+                'email': current_user.email,
+                'name': current_user.name,
+                'primary_language_code': current_user.primary_language_code,
+                'translator_languages': current_user.translator_languages
+            }
+        }), 200
+    else:
+        return jsonify({
+            'success': True,
+            'authenticated': False,
+            'user': None
+        }), 200
+
+
+@bp.route('/logout', methods=['POST'])
 def logout():
-    """Log out the current user"""
+    """Log out the current user (API endpoint for frontend)"""
     user_email = current_user.email if current_user.is_authenticated else 'anonymous'
 
     logout_user()
@@ -111,7 +221,8 @@ def logout():
         del session['google_oauth_token']
 
     logger.info(f'User {user_email} logged out successfully')
-    flash('Successfully logged out.', 'success')
 
-    # 302 Found - standard redirect after logout
-    return redirect(url_for('home'), code=302)
+    return jsonify({
+        'success': True,
+        'message': 'Successfully logged out'
+    }), 200
