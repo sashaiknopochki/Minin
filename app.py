@@ -16,7 +16,8 @@ def create_app(config_name=None):
     # Initialize CORS for React frontend
     CORS(app, resources={
         r"/api/*": {"origins": ["http://localhost:5173"]},
-        r"/auth/*": {"origins": ["http://localhost:5173"]}
+        r"/auth/*": {"origins": ["http://localhost:5173"]},
+        r"/translation/*": {"origins": ["http://localhost:5173"]}
     }, supports_credentials=True)
 
     # Initialize SQLAlchemy
