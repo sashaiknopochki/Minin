@@ -3,6 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
 
@@ -190,6 +199,27 @@ export default function HomePage() {
     }
   };
 
+  // Handle Google Sign-In success
+  const handleGoogleSignIn = async (response: google.accounts.id.CredentialResponse) => {
+    try {
+      // TODO: Send the credential to your backend for verification
+      console.log("Google Sign-In successful", response);
+      // You would typically send response.credential to your backend here
+      // const result = await fetch("/auth/google", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ credential: response.credential }),
+      // });
+    } catch (error) {
+      console.error("Sign-in error:", error);
+    }
+  };
+
+  // Handle Google Sign-In error
+  const handleGoogleSignInError = () => {
+    console.error("Google Sign-In failed");
+  };
+
   return (
     <div>
       {/* Header */}
@@ -218,9 +248,29 @@ export default function HomePage() {
           </div>
 
           {/* Sign In Button */}
-          <Button className="h-9 px-4 py-2 shadow-sm">
-            Sign In
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="h-9 px-4 py-2 shadow-sm">
+                Sign In
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold leading-7">
+                  Welcome to Minin
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground leading-5">
+                  Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-2 w-full">
+                <GoogleSignInButton
+                  onSuccess={handleGoogleSignIn}
+                  onError={handleGoogleSignInError}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </header>
 
