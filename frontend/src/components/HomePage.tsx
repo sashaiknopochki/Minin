@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,6 +7,17 @@ import { useLanguageContext } from "@/contexts/LanguageContext";
 
 export default function HomePage() {
   const { languages, loading, error } = useLanguageContext();
+
+  // Track selected language for each input
+  const [lang1, setLang1] = useState("ru");
+  const [lang2, setLang2] = useState("en");
+  const [lang3, setLang3] = useState("de");
+
+  // Helper function to get language name by code
+  const getLanguageName = (code: string) => {
+    const lang = languages.find((l) => l.code === code);
+    return lang ? lang.en_name : code;
+  };
 
   return (
     <div>
@@ -44,9 +56,9 @@ export default function HomePage() {
       {/* Main Content - Language Inputs */}
       <main className="w-full pt-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* Russian Input */}
+          {/* First Input */}
           <div className="flex flex-col gap-6">
-            <Select defaultValue="ru" disabled={loading}>
+            <Select value={lang1} onValueChange={setLang1} disabled={loading}>
               <SelectTrigger className="h-9 bg-background">
                 <SelectValue placeholder={loading ? "Loading languages..." : "Select language"} />
               </SelectTrigger>
@@ -64,14 +76,14 @@ export default function HomePage() {
             </Select>
 
             <Textarea
-              placeholder="Введите текст на русском"
+              placeholder={`Enter a text in ${getLanguageName(lang1)}`}
               className="h-40 resize-none bg-background"
             />
           </div>
 
-          {/* English Input */}
+          {/* Second Input */}
           <div className="flex flex-col gap-6">
-            <Select defaultValue="en" disabled={loading}>
+            <Select value={lang2} onValueChange={setLang2} disabled={loading}>
               <SelectTrigger className="h-9 bg-background">
                 <SelectValue placeholder={loading ? "Loading languages..." : "Select language"} />
               </SelectTrigger>
@@ -89,14 +101,14 @@ export default function HomePage() {
             </Select>
 
             <Textarea
-              placeholder="Enter a text in English"
+              placeholder={`Enter a text in ${getLanguageName(lang2)}`}
               className="h-40 resize-none bg-background"
             />
           </div>
 
-          {/* German Input */}
+          {/* Third Input */}
           <div className="flex flex-col gap-6">
-            <Select defaultValue="de" disabled={loading}>
+            <Select value={lang3} onValueChange={setLang3} disabled={loading}>
               <SelectTrigger className="h-9 bg-background">
                 <SelectValue placeholder={loading ? "Loading languages..." : "Select language"} />
               </SelectTrigger>
@@ -114,7 +126,7 @@ export default function HomePage() {
             </Select>
 
             <Textarea
-              placeholder="Gib einen Text auf Deutsch ein"
+              placeholder={`Enter a text in ${getLanguageName(lang3)}`}
               className="h-40 resize-none bg-background"
             />
           </div>
