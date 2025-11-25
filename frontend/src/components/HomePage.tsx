@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguageContext } from "@/contexts/LanguageContext";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, Copy, Check } from "lucide-react";
 
 interface TranslationResult {
   [language: string]: [string, string][];
@@ -29,6 +29,9 @@ export default function HomePage() {
   // Track translation state
   const [translating, setTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
+
+  // Track copied state
+  const [copiedField, setCopiedField] = useState<1 | 2 | 3 | null>(null);
 
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -168,6 +171,25 @@ export default function HomePage() {
     setTranslationError(null);
   };
 
+  // Copy field function
+  const copyField = async (fieldNumber: 1 | 2 | 3) => {
+    const text = fieldNumber === 1 ? text1 : fieldNumber === 2 ? text2 : text3;
+
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldNumber);
+
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedField(null);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy text:", err);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -229,19 +251,32 @@ export default function HomePage() {
                 value={text1}
                 onChange={(e) => handleTextChange(1, e.target.value)}
                 placeholder={`Enter text in ${getLanguageName(lang1)}`}
-                className={`h-40 resize-none bg-background pr-10 ${
+                className={`h-40 resize-none bg-background pr-10 text-xl ${
                   sourceField === 1 ? "ring-2 ring-primary" : ""
                 } ${translating && sourceField === 1 ? "opacity-50" : ""}`}
                 disabled={translating && sourceField !== 1}
               />
               {text1 && (
-                <button
-                  onClick={() => clearField(1)}
-                  className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
-                  aria-label="Clear field"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
+                <>
+                  <button
+                    onClick={() => clearField(1)}
+                    className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                    aria-label="Clear field"
+                  >
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => copyField(1)}
+                    className="absolute bottom-2 left-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                    aria-label="Copy to clipboard"
+                  >
+                    {copiedField === 1 ? (
+                      <Check className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <Copy className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </button>
+                </>
               )}
               {translating && sourceField === 1 && (
                 <div className="absolute bottom-2 right-2">
@@ -275,19 +310,32 @@ export default function HomePage() {
                 value={text2}
                 onChange={(e) => handleTextChange(2, e.target.value)}
                 placeholder={`Enter text in ${getLanguageName(lang2)}`}
-                className={`h-40 resize-none bg-background pr-10 ${
+                className={`h-40 resize-none bg-background pr-10 text-xl ${
                   sourceField === 2 ? "ring-2 ring-primary" : ""
                 } ${translating && sourceField === 2 ? "opacity-50" : ""}`}
                 disabled={translating && sourceField !== 2}
               />
               {text2 && (
-                <button
-                  onClick={() => clearField(2)}
-                  className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
-                  aria-label="Clear field"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
+                <>
+                  <button
+                    onClick={() => clearField(2)}
+                    className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                    aria-label="Clear field"
+                  >
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => copyField(2)}
+                    className="absolute bottom-2 left-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                    aria-label="Copy to clipboard"
+                  >
+                    {copiedField === 2 ? (
+                      <Check className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <Copy className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </button>
+                </>
               )}
               {translating && sourceField === 2 && (
                 <div className="absolute bottom-2 right-2">
@@ -321,19 +369,32 @@ export default function HomePage() {
                 value={text3}
                 onChange={(e) => handleTextChange(3, e.target.value)}
                 placeholder={`Enter text in ${getLanguageName(lang3)}`}
-                className={`h-40 resize-none bg-background pr-10 ${
+                className={`h-40 resize-none bg-background pr-10 text-xl ${
                   sourceField === 3 ? "ring-2 ring-primary" : ""
                 } ${translating && sourceField === 3 ? "opacity-50" : ""}`}
                 disabled={translating && sourceField !== 3}
               />
               {text3 && (
-                <button
-                  onClick={() => clearField(3)}
-                  className="absolute top-2 right-2 p-1 rounded-full hover:bg-muted transition-colors"
-                  aria-label="Clear field"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
+                <>
+                  <button
+                    onClick={() => clearField(3)}
+                    className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                    aria-label="Clear field"
+                  >
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => copyField(3)}
+                    className="absolute bottom-2 left-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                    aria-label="Copy to clipboard"
+                  >
+                    {copiedField === 3 ? (
+                      <Check className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <Copy className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </button>
+                </>
               )}
               {translating && sourceField === 3 && (
                 <div className="absolute bottom-2 right-2">
