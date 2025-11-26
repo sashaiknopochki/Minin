@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import UserMenu from "@/components/UserMenu";
+import ParticleFlower from "@/components/ParticleFlower";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
@@ -360,6 +361,22 @@ export default function HomePage() {
           )}
         </div>
       </header>
+
+      {/* ParticleFlower Animation - Only for logged-out users */}
+      {!user && (
+        <div className="w-full flex justify-center my-8">
+          <div className="w-full relative">
+            <ParticleFlower />
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <h2 className="w-auto text-8xl font-light text-center">
+                Translate once.<br />Remember forever.
+              </h2>
+                <p className="w-auto text-2xl py-10 px-72 text-center">Multi-language translator that teaches you as you search
+with AI-powered quizzes to help you build active vocabulary.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content - Language Inputs */}
       <main className="w-full pt-12">
