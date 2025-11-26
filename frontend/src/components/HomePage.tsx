@@ -167,6 +167,11 @@ export default function HomePage() {
     else if (fieldNumber === 2) setText2(value);
     else setText3(value);
 
+    // Clear translation details for the source field (it's not a target anymore)
+    if (fieldNumber === 1) setTranslations1(null);
+    else if (fieldNumber === 2) setTranslations2(null);
+    else setTranslations3(null);
+
     // Set this field as the source
     setSourceField(fieldNumber);
 
