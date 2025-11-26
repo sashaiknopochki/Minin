@@ -366,22 +366,28 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* First Input */}
           <div className="flex flex-col gap-6">
-            <Select value={lang1} onValueChange={setLang1} disabled={languagesLoading}>
-              <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-              </SelectTrigger>
-              <SelectContent>
-                {languagesError ? (
-                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                ) : (
-                  languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.en_name} ({lang.original_name})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            {user ? (
+              <div className="text-base font-medium text-left">
+                {getLanguageName(lang1)}
+              </div>
+            ) : (
+              <Select value={lang1} onValueChange={setLang1} disabled={languagesLoading}>
+                <SelectTrigger className="h-9 bg-background">
+                  <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {languagesError ? (
+                    <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                  ) : (
+                    languages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.en_name} ({lang.original_name})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            )}
 
             <div className="relative">
               <Textarea
@@ -437,22 +443,28 @@ export default function HomePage() {
 
           {/* Second Input */}
           <div className="flex flex-col gap-6">
-            <Select value={lang2} onValueChange={setLang2} disabled={languagesLoading}>
-              <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-              </SelectTrigger>
-              <SelectContent>
-                {languagesError ? (
-                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                ) : (
-                  languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.en_name} ({lang.original_name})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            {user ? (
+              <div className="text-base font-medium text-left">
+                {getLanguageName(lang2)}
+              </div>
+            ) : (
+              <Select value={lang2} onValueChange={setLang2} disabled={languagesLoading}>
+                <SelectTrigger className="h-9 bg-background">
+                  <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {languagesError ? (
+                    <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                  ) : (
+                    languages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.en_name} ({lang.original_name})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            )}
 
             <div className="relative">
               <Textarea
@@ -508,22 +520,28 @@ export default function HomePage() {
 
           {/* Third Input */}
           <div className="flex flex-col gap-6">
-            <Select value={lang3} onValueChange={setLang3} disabled={languagesLoading}>
-              <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-              </SelectTrigger>
-              <SelectContent>
-                {languagesError ? (
-                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                ) : (
-                  languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.en_name} ({lang.original_name})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            {user ? (
+              <div className="text-base font-medium text-left">
+                {getLanguageName(lang3)}
+              </div>
+            ) : (
+              <Select value={lang3} onValueChange={setLang3} disabled={languagesLoading}>
+                <SelectTrigger className="h-9 bg-background">
+                  <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {languagesError ? (
+                    <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                  ) : (
+                    languages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.en_name} ({lang.original_name})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            )}
 
             <div className="relative">
               <Textarea
