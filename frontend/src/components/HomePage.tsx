@@ -48,11 +48,67 @@ export default function HomePage() {
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Get browser/OS language
+  const getBrowserLanguage = (): string => {
+    const browserLang = navigator.language.split('-')[0]; // e.g., "en-US" -> "en"
+    return browserLang;
+  };
+
+  // Get native language based on auth state
+  const getNativeLanguage = (): string => {
+    if (user && user.primary_language_code) {
+      // User is logged in - use their primary language
+      const userLang = languages.find(l => l.code === user.primary_language_code);
+      return userLang ? userLang.en_name : "English";
+    } else {
+      // User is not logged in - use browser language
+      const browserLangCode = getBrowserLanguage();
+      const browserLang = languages.find(l => l.code === browserLangCode);
+      return browserLang ? browserLang.en_name : "English";
+    }
+  };
+
   // Helper function to get language name by code
   const getLanguageName = (code: string) => {
     const lang = languages.find((l) => l.code === code);
     return lang ? lang.en_name : code;
   };
+
+  // Initialize languages on mount - ensure all 3 are different
+  useEffect(() => {
+    if (languages.length === 0) return;
+
+    const popularLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko"];
+    const browserLangCode = getBrowserLanguage();
+
+    if (user && user.primary_language_code && user.translator_languages) {
+      // LOGGED IN USER
+      // Column 1: User's primary language
+      const primaryLang = user.primary_language_code;
+
+      // Columns 2 & 3: From translator_languages (ensure different from primary)
+      const translatorLangs = user.translator_languages.filter(
+        (lang: string) => lang !== primaryLang
+      );
+
+      setLang1(primaryLang);
+      setLang2(translatorLangs[0] || "en");
+      setLang3(translatorLangs[1] || "de");
+    } else {
+      // LOGGED OUT USER
+      // Column 1: Browser language
+      const primaryLang = browserLangCode;
+
+      // Columns 2 & 3: Popular languages (NOT browser language)
+      const otherLangs = popularLanguages.filter(
+        lang => lang !== primaryLang && languages.some(l => l.code === lang)
+      );
+
+      setLang1(primaryLang);
+      setLang2(otherLangs[0] || "es");
+      setLang3(otherLangs[1] || "de");
+    }
+  }, [languages, user]);
 
   // Function to call translation API
   const translateText = async (
@@ -73,7 +129,7 @@ export default function HomePage() {
           text,
           source_language: getLanguageName(sourceLang),
           target_languages: targetLangs.map(getLanguageName),
-          native_language: "English", // TODO: Get from user settings
+          native_language: getNativeLanguage(),
           model: "gpt-4.1-mini",
         }),
       });
@@ -142,11 +198,16 @@ export default function HomePage() {
       const translations = await translateText(value, sourceLang, targetLangs);
 
       if (translations) {
-        // Extract first translation for each language
+        // Format all translations with context for each language
         const targetLangNames = targetLangs.map(getLanguageName);
         const translatedTexts = targetLangNames.map((langName) => {
           const translation = translations[langName];
-          return translation && translation[0] ? translation[0][0] : "";
+          if (!translation || !Array.isArray(translation)) return "";
+
+          // Format: "word1 (context1), word2 (context2), ..."
+          return translation
+            .map(([word, context]) => `${word} ${context}`)
+            .join(", ");
         });
 
         // Update target fields
@@ -314,7 +375,7 @@ export default function HomePage() {
                 value={text1}
                 onChange={(e) => handleTextChange(1, e.target.value)}
                 placeholder={`Enter text in ${getLanguageName(lang1)}`}
-                className={`h-40 resize-none bg-background pr-10 text-xl ${
+                className={`h-60 resize-none bg-background pr-10 text-xl ${
                   sourceField === 1 ? "ring-2 ring-primary" : ""
                 } ${translating && sourceField === 1 ? "opacity-50" : ""}`}
                 disabled={translating && sourceField !== 1}
@@ -373,7 +434,7 @@ export default function HomePage() {
                 value={text2}
                 onChange={(e) => handleTextChange(2, e.target.value)}
                 placeholder={`Enter text in ${getLanguageName(lang2)}`}
-                className={`h-40 resize-none bg-background pr-10 text-xl ${
+                className={`h-60 resize-none bg-background pr-10 text-xl ${
                   sourceField === 2 ? "ring-2 ring-primary" : ""
                 } ${translating && sourceField === 2 ? "opacity-50" : ""}`}
                 disabled={translating && sourceField !== 2}
@@ -432,7 +493,7 @@ export default function HomePage() {
                 value={text3}
                 onChange={(e) => handleTextChange(3, e.target.value)}
                 placeholder={`Enter text in ${getLanguageName(lang3)}`}
-                className={`h-40 resize-none bg-background pr-10 text-xl ${
+                className={`h-60 resize-none bg-background pr-10 text-xl ${
                   sourceField === 3 ? "ring-2 ring-primary" : ""
                 } ${translating && sourceField === 3 ? "opacity-50" : ""}`}
                 disabled={translating && sourceField !== 3}
