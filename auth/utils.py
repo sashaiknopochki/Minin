@@ -29,13 +29,13 @@ def get_or_create_user(google_id, email, name):
             db.session.commit()
             return user
 
-        # Create new user with default settings
+        # Create new user without default languages (will trigger onboarding)
         user = User(
             google_id=google_id,
             email=email,
             name=name,
-            primary_language_code='ru',  # Default to Russian
-            translator_languages=['de', 'en', 'ru'],  # Default languages
+            primary_language_code=None,  # User will set during onboarding
+            translator_languages=None,  # User will set during onboarding
             quiz_frequency=5,  # Default quiz frequency
             quiz_mode_enabled=True,
             searches_since_last_quiz=0,

@@ -209,6 +209,65 @@ def get_current_user():
         }), 200
 
 
+@bp.route('/update-languages', methods=['POST'])
+def update_languages():
+    """
+    Update user's language preferences.
+    Used during onboarding and settings.
+    """
+    if not current_user.is_authenticated:
+        return jsonify({
+            'success': False,
+            'error': 'Not authenticated'
+        }), 401
+
+    try:
+        data = request.get_json()
+        primary_language_code = data.get('primary_language_code')
+        translator_languages = data.get('translator_languages')
+
+        if not primary_language_code:
+            return jsonify({
+                'success': False,
+                'error': 'primary_language_code is required'
+            }), 400
+
+        if not translator_languages or not isinstance(translator_languages, list):
+            return jsonify({
+                'success': False,
+                'error': 'translator_languages must be a non-empty array'
+            }), 400
+
+        # Import here to avoid circular imports
+        from models import db
+
+        # Update user languages
+        current_user.primary_language_code = primary_language_code
+        current_user.translator_languages = translator_languages
+
+        db.session.commit()
+
+        logger.info(f'Updated languages for user {current_user.email}')
+
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': current_user.id,
+                'email': current_user.email,
+                'name': current_user.name,
+                'primary_language_code': current_user.primary_language_code,
+                'translator_languages': current_user.translator_languages
+            }
+        }), 200
+
+    except Exception as e:
+        logger.exception(f'Exception updating languages for user {current_user.email}: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': 'An unexpected error occurred'
+        }), 500
+
+
 @bp.route('/logout', methods=['POST'])
 def logout():
     """Log out the current user (API endpoint for frontend)"""
