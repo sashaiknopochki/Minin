@@ -14,6 +14,7 @@ import {
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import UserMenu from "@/components/UserMenu";
 import ParticleFlower from "@/components/ParticleFlower";
+import EtherealTorusFlow from "@/components/EtherealTorusFlow";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
@@ -364,16 +365,16 @@ export default function HomePage() {
 
       {/* ParticleFlower Animation - Only for logged-out users */}
       {!user && (
-        <div className="w-full flex justify-center my-8">
-          <div className="w-full relative">
-            <ParticleFlower />
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <h2 className="w-auto text-8xl font-light text-center">
-                Translate once.<br />Remember forever.
-              </h2>
-                <p className="w-auto text-2xl py-10 px-72 text-center">Multi-language translator that teaches you as you search
-with AI-powered quizzes to help you build active vocabulary.</p>
-            </div>
+        <div className="w-full relative my-8">
+          <div className="w-full flex justify-center">
+            <EtherealTorusFlow />
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            <h2 className="w-full text-8xl font-medium text-center px-8">
+              Translate once.<br />Remember forever.
+            </h2>
+            <p className="w-full text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
+with AI-powered quizzes increasing active vocabulary.</p>
           </div>
         </div>
       )}

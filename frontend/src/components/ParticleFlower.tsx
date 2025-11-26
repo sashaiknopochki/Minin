@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 
 // themes: feminine creative force, eternal fertility, root energy
@@ -16,13 +17,13 @@ const ParticleFlower = () => {
 
     const ctx = canvas.getContext('2d');
     ctxRef.current = ctx;
-    const width = canvas.width = 550;
-    const height = canvas.height = 550;
+    const width = canvas.width = 1000;
+    const height = canvas.height = 600;
     const centerX = width / 2;
     const centerY = height / 2;
 
-    const PARTICLE_COUNT = 30000;
-    const FORM_SCALE = 3.6; // Increased by 50% from 2.4
+    const PARTICLE_COUNT = 80000;
+    const FORM_SCALE = 4; // Increased by 50% from 2.4
     const particles = [];
     particlesRef.current = particles;
 
@@ -154,8 +155,8 @@ const ParticleFlower = () => {
 
   return (
     <div style={{
-      width: '550px',
-      height: '550px',
+      width: '1000px',
+      height: '600px',
       margin: 'auto',
       overflow: 'hidden'
     }}>
@@ -163,8 +164,8 @@ const ParticleFlower = () => {
         ref={canvasRef}
         style={{
           display: 'block',
-          width: '550px',
-          height: '550px'
+          width: '1000px',
+          height: '600px'
         }}
       />
     </div>
@@ -172,3 +173,5 @@ const ParticleFlower = () => {
 };
 
 export default ParticleFlower;
+
+
