@@ -86,20 +86,20 @@ Each translation should be an array with two elements: [translation, context/mea
 Examples:
 
 CORRECT - combining repeated words:
-If translating "собака" from Russian to English (with contexts in Russian):
+If translating "собака" from Russian to English with contexts in Russian:
 {{
-  "English": [["dog", "(домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата)"]]
+  "English": [["dog", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
 }}
 
 INCORRECT - DO NOT do this:
 {{
-  "English": [["dog", "(домашнее животное)"], ["dog", "(презрительное обозначение)"], ["dog", "(инструмент)"]]
+  "English": [["dog", "домашнее животное"], ["dog", "презрительное обозначение"], ["dog", "инструмент"]]
 }}
 
 CORRECT - different words for different meanings:
-If translating "bank" from English to German (with contexts in Russian):
+If translating "bank" from English to German with contexts in Russian:
 {{
-  "German": [["Bank", "(финансовое учреждение)"], ["Ufer", "(берег реки)"], ["Böschung", "(насыпь)"]]
+  "German": [["Bank", "финансовое учреждение"], ["Ufer", "берег реки"], ["Böschung", "насыпь"]]
 }}
 
 Only return the JSON object, nothing else."""

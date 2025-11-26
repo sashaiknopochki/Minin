@@ -35,6 +35,11 @@ export default function HomePage() {
   const [text2, setText2] = useState("");
   const [text3, setText3] = useState("");
 
+  // Track structured translations for each field
+  const [translations1, setTranslations1] = useState<[string, string][] | null>(null);
+  const [translations2, setTranslations2] = useState<[string, string][] | null>(null);
+  const [translations3, setTranslations3] = useState<[string, string][] | null>(null);
+
   // Track which field was last edited (determines source language)
   const [sourceField, setSourceField] = useState<1 | 2 | 3 | null>(null);
 
@@ -198,28 +203,38 @@ export default function HomePage() {
       const translations = await translateText(value, sourceLang, targetLangs);
 
       if (translations) {
-        // Format all translations with context for each language
+        // Extract first translation for textarea
         const targetLangNames = targetLangs.map(getLanguageName);
         const translatedTexts = targetLangNames.map((langName) => {
           const translation = translations[langName];
-          if (!translation || !Array.isArray(translation)) return "";
+          if (!translation || !Array.isArray(translation) || translation.length === 0) return "";
 
-          // Format: "word1 (context1), word2 (context2), ..."
-          return translation
-            .map(([word, context]) => `${word} ${context}`)
-            .join(", ");
+          // Show only the first translation word in textarea
+          return translation[0][0];
+        });
+
+        // Store structured data for detailed view
+        const structuredTranslations = targetLangNames.map((langName) => {
+          const translation = translations[langName];
+          return translation || [];
         });
 
         // Update target fields
         if (fieldNumber === 1) {
           setText2(translatedTexts[0]);
           setText3(translatedTexts[1]);
+          setTranslations2(structuredTranslations[0]);
+          setTranslations3(structuredTranslations[1]);
         } else if (fieldNumber === 2) {
           setText1(translatedTexts[0]);
           setText3(translatedTexts[1]);
+          setTranslations1(structuredTranslations[0]);
+          setTranslations3(structuredTranslations[1]);
         } else {
           setText1(translatedTexts[0]);
           setText2(translatedTexts[1]);
+          setTranslations1(structuredTranslations[0]);
+          setTranslations2(structuredTranslations[1]);
         }
       }
     }, 1000);
@@ -227,19 +242,12 @@ export default function HomePage() {
 
   // Clear field function
   const clearField = (fieldNumber: 1 | 2 | 3) => {
-    if (fieldNumber === 1) {
-      setText1("");
-      setText2("");
-      setText3("");
-    } else if (fieldNumber === 2) {
-      setText1("");
-      setText2("");
-      setText3("");
-    } else {
-      setText1("");
-      setText2("");
-      setText3("");
-    }
+    setText1("");
+    setText2("");
+    setText3("");
+    setTranslations1(null);
+    setTranslations2(null);
+    setTranslations3(null);
     setSourceField(null);
     setTranslationError(null);
   };
@@ -408,6 +416,18 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+
+            {/* Translation Details */}
+            {translations1 && translations1.length > 0 && (
+              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
+                {translations1.map(([word, context], index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <div className="text-base font-medium">{word}</div>
+                    <div className="text-sm text-muted-foreground">{context}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Second Input */}
@@ -467,6 +487,18 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+
+            {/* Translation Details */}
+            {translations2 && translations2.length > 0 && (
+              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
+                {translations2.map(([word, context], index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <div className="text-base font-medium">{word}</div>
+                    <div className="text-sm text-muted-foreground">{context}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Third Input */}
@@ -526,6 +558,18 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+
+            {/* Translation Details */}
+            {translations3 && translations3.length > 0 && (
+              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
+                {translations3.map(([word, context], index) => (
+                  <div key={index} className="flex flex-col gap-1">
+                    <div className="text-base font-medium">{word}</div>
+                    <div className="text-sm text-muted-foreground">{context}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
