@@ -348,7 +348,7 @@ export default function HomePage() {
                     Welcome to Minin
                   </DialogTitle>
                   <DialogDescription className="text-sm text-muted-foreground leading-5">
-                    Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.
+                    'Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.'
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2 w-full">
@@ -363,24 +363,51 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ParticleFlower Animation - Only for logged-out users */}
+      {/* ParticleFlower Animation Background - Only for logged-out users */}
       {!user && (
-        <div className="w-full relative my-8">
-          <div className="w-full flex justify-center">
-            <EtherealTorusFlow />
-          </div>
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <div className="fixed left-0 w-full flex justify-center pointer-events-none z-0" style={{ top: '-96px' }}>
+          <EtherealTorusFlow />
+        </div>
+      )}
+
+      {/* Hero Text - Only for logged-out users */}
+      {!user && (
+        <div className="w-full my-8 pt-24">
+          <div className="w-full flex flex-col items-center justify-center">
             <h2 className="w-full text-8xl font-medium text-center px-8">
               Translate once.<br />Remember forever.
             </h2>
             <p className="w-full text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
 with AI-powered quizzes increasing active vocabulary.</p>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="h-9 px-4 py-2 shadow-sm">
+                  Get Started
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-semibold leading-7">
+                    Welcome to Minin
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground leading-5">
+                    'Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.'
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-2 w-full">
+                  <GoogleSignInButton
+                    onSuccess={handleGoogleSignIn}
+                    onError={handleGoogleSignInError}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       )}
 
       {/* Main Content - Language Inputs */}
-      <main className="w-full pt-12">
+      <main className="w-full pt-12 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* First Input */}
           <div className="flex flex-col gap-6">

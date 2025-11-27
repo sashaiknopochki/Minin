@@ -11,8 +11,8 @@ const EtherealTorusFlow = () => {
     const ctx = canvas.getContext('2d');
 
     // Set canvas size according to project requirements
-    canvas.width = 550;
-    canvas.height = 550;
+    canvas.width = 1500;
+    canvas.height = 1500;
 
     // Transparent background to show page background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -20,7 +20,7 @@ const EtherealTorusFlow = () => {
     // Particle storage
     const particles = [];
     // Slightly increase particle count for smoother appearance at slower speeds
-    const numParticles = 12000;
+    const numParticles = 48000;
     let time = 0;
 
     // Particle class
@@ -33,8 +33,8 @@ const EtherealTorusFlow = () => {
         // Random position on a torus
         this.u = Math.random() * Math.PI * 2;
         this.v = Math.random() * Math.PI * 2;
-        this.R = 150; // Major radius (scaled down for 550px canvas)
-        this.r = 60 + Math.random() * 30; // Minor radius variation
+        this.R = 480; // Major radius (scaled for 1500px canvas)
+        this.r = 96 + Math.random() * 45; // Minor radius variation
 
         this.size = Math.random() * 1.5 + 0.5;
         this.opacity = Math.random() * 0.8 + 0.2;
@@ -142,8 +142,8 @@ const EtherealTorusFlow = () => {
 
   return (
       <div style={{
-        width: '550px',
-        height: '550px',
+        width: '1500px',
+        height: '900px',
         borderRadius: '8px',
         margin: '0 auto',
         display: 'flex',
