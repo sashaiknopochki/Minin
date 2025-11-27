@@ -9,6 +9,7 @@ import logging
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from openai import OpenAI
+from pydantic import BaseModel, Field
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -16,7 +17,33 @@ logger = logging.getLogger(__name__)
 # Model constants
 GPT_4_1_MINI = "gpt-4.1-mini"
 O4_MINI = "o4-mini"
-DEFAULT_MODEL = GPT_4_1_MINI
+DEFAULT_MODEL = O4_MINI
+
+# Models that support structured outputs
+STRUCTURED_OUTPUT_MODELS = {
+    "gpt-4o-mini",
+    "gpt-4o-2024-08-06",
+    "gpt-4o-2024-11-20",
+    "gpt-4o",
+}
+
+
+# Pydantic models for structured outputs
+class TranslationEntry(BaseModel):
+    """A single translation entry consisting of [word, context/meaning]."""
+    word: str = Field(description="The translated word or phrase")
+    context: str = Field(description="Context or meaning explanation in the native language")
+
+
+class TranslationResponse(BaseModel):
+    """Structured response containing translations for all target languages.
+
+    Each field is a target language name with a list of translation entries.
+    The model is dynamically created based on target_languages parameter.
+    """
+    translations: Dict[str, List[List[str]]] = Field(
+        description="Dictionary where keys are target language names and values are arrays of [translation, context] pairs"
+    )
 
 
 def translate_text(
@@ -80,7 +107,7 @@ IMPORTANT RULES:
 4. CRITICAL: If multiple meanings translate to the EXACT SAME word in the target language, you MUST combine them into ONE entry with all meanings separated by commas. DO NOT repeat the same word multiple times.
 5. Only include translations that are actually valid in the target language - do not include meanings that don't exist in that language
 
-Return your response as a JSON object where each key is a target language and the value is an array of translations.
+Return your response as a JSON object with a "translations" field.
 Each translation should be an array with two elements: [translation, context/meaning in {native_language}].
 
 Examples:
@@ -88,44 +115,98 @@ Examples:
 CORRECT - combining repeated words:
 If translating "собака" from Russian to English with contexts in Russian:
 {{
-  "English": [["dog", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
+  "translations": {{
+    "English": [["dog", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
+  }}
 }}
 
 INCORRECT - DO NOT do this:
 {{
-  "English": [["dog", "домашнее животное"], ["dog", "презрительное обозначение"], ["dog", "инструмент"]]
+  "translations": {{
+    "English": [["dog", "домашнее животное"], ["dog", "презрительное обозначение"], ["dog", "инструмент"]]
+  }}
 }}
 
 CORRECT - different words for different meanings:
 If translating "bank" from English to German with contexts in Russian:
 {{
-  "German": [["Bank", "финансовое учреждение"], ["Ufer", "берег реки"], ["Böschung", "насыпь"]]
-}}
+  "translations": {{
+    "German": [["Bank", "финансовое учреждение"], ["Ufer", "берег реки"], ["Böschung", "насыпь"]]
+  }}
+}}"""
 
-Only return the JSON object, nothing else."""
+    # Check if model supports structured outputs
+    use_structured_output = model in STRUCTURED_OUTPUT_MODELS
 
     # Make API call
     try:
         logger.info(f"Translating '{text}' from {source_language} to {target_languages}")
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
+        # Prepare API call parameters
+        api_params = {
+            "model": model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
             ],
-            temperature=0.3,
-            max_tokens=800
-        )
+            "temperature": 0.3,
+            "max_tokens": 800
+        }
 
-        translation_content = response.choices[0].message.content.strip()
+        # Add structured output for supported models
+        if use_structured_output:
+            # Build dynamic schema with specific language properties
+            language_properties = {}
+            for lang in target_languages:
+                language_properties[lang] = {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 2,
+                        "maxItems": 2
+                    }
+                }
+
+            json_schema = {
+                "name": "translation_response",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "translations": {
+                            "type": "object",
+                            "properties": language_properties,
+                            "required": target_languages,
+                            "additionalProperties": False
+                        }
+                    },
+                    "required": ["translations"],
+                    "additionalProperties": False
+                }
+            }
+            api_params["response_format"] = {
+                "type": "json_schema",
+                "json_schema": json_schema
+            }
+            logger.info(f"Using structured outputs for model {model}")
+        else:
+            # For models that don't support structured outputs, request JSON mode
+            api_params["response_format"] = {"type": "json_object"}
+            logger.info(f"Using JSON mode for model {model}")
+
+        response = client.chat.completions.create(**api_params)
+
+        translation_content = response.choices[0].message.content
 
         # Parse JSON response
         try:
-            translations_dict = json.loads(translation_content)
-            if not isinstance(translations_dict, dict):
-                logger.warning("LLM returned non-dict response, using fallback")
-                translations_dict = {target_languages[0]: [[translation_content, ""]]}
+            response_data = json.loads(translation_content)
+            translations_dict = response_data.get("translations", {})
+
+            # Fallback if translations not in expected format
+            if not translations_dict and isinstance(response_data, dict):
+                translations_dict = response_data
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse LLM response as JSON: {e}")
             translations_dict = {target_languages[0]: [[translation_content, ""]]}

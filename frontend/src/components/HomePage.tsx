@@ -701,7 +701,7 @@ with AI-powered quizzes increasing active vocabulary.</p>
       {!user && (
       <section className="w-full py-0">
         <h2 className="w-full text-[120px] md:text-[160px] lg:text-[480px] font-bold text-center">minin</h2>
-          <p className="text-lg">Designed and Developed by Sasha — <a href='http://linkedin.com/in/aleksandr.sudin'>Hire me!</a></p>
+          <p className="text-lg">Designed and Developed by<a href='http://linkedin.com/in/aleksandr.sudin'> Sasha — Hire me!</a></p>
       </section>
       )}
     </div>
