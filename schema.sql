@@ -98,7 +98,7 @@ Table phrase_translations {
   created_at timestamp [default: 'CURRENT_TIMESTAMP']
 
   indexes {
-    phrase_id [unique]
+    (phrase_id, target_language_code) [unique, note: 'One cached translation per phrase-target pair']
   }
 
 }

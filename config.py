@@ -31,8 +31,17 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True  # Require HTTPS in production
 
 
+class TestingConfig(Config):
+    """Testing environment configuration"""
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SESSION_COOKIE_SECURE = False
+
+
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,
     'default': DevelopmentConfig
 }
