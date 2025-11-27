@@ -1,5 +1,9 @@
 from flask import Blueprint, jsonify, request
+from flask_login import current_user
 from services.llm_translation_service import translate_text, GPT_4_1_MINI
+from services.user_search_service import log_user_search
+from services.session_service import get_or_create_session
+from services.language_utils import get_language_code
 
 bp = Blueprint('translation', __name__, url_prefix='/translation')
 
@@ -86,6 +90,30 @@ def translate():
             model=model,
             native_language=native_language
         )
+
+        # Log the search to database if user is authenticated and translation succeeded
+        if current_user.is_authenticated and result.get('success'):
+            try:
+                # Get language code from the database
+                source_language_code = get_language_code(source_language)
+
+                if source_language_code:
+                    # Get or create session for this user
+                    session = get_or_create_session(current_user.id)
+
+                    # Log the search
+                    context_sentence = data.get('context_sentence')  # Optional context
+                    log_user_search(
+                        user_id=current_user.id,
+                        phrase_text=text,
+                        source_language_code=source_language_code,
+                        llm_response=result,
+                        session_id=session.session_id,
+                        context_sentence=context_sentence
+                    )
+            except Exception as e:
+                # Log error but don't fail the request
+                print(f"Failed to log user search: {str(e)}")
 
         # Return result with appropriate status code
         status_code = 200 if result['success'] else 500
