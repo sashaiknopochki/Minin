@@ -92,8 +92,8 @@ def log_user_search(
             db.session.add(phrase)
             db.session.flush()  # Get the phrase ID before creating the search
 
-        # Increment search count
-        phrase.search_count = (phrase.search_count or 0) + 1
+        # Note: search_count is incremented in phrase_translation_service
+        # to avoid double-counting when both services are used together
 
         # Create the UserSearch entry
         user_search = UserSearch(

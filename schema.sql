@@ -30,6 +30,8 @@ Table phrases {
   created_at timestamp [default: 'CURRENT_TIMESTAMP']
   type varchar [note: 'word, phrase, phrasal_verb, example_sentence']
   is_quizzable boolean [default: true]
+  search_count integer [default: 0, note: 'analytics: how many times searched']
+  source_info_json json [note: 'LLM analysis of source word: [word, grammar_info, context]']
 
   indexes {
     (text, language_code) [unique]

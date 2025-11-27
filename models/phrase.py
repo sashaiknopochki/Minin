@@ -22,6 +22,10 @@ class Phrase(db.Model):
     # Analytics: track how many times this phrase has been searched
     search_count = db.Column(db.Integer, default=0)
 
+    # Source phrase information from LLM (grammar, part of speech, context)
+    # Format: [word, grammar_info, context] e.g., ["geben", "verb, infinitive", "to give something"]
+    source_info_json = db.Column(db.JSON)
+
     # Relationships
     language = db.relationship('Language')
     user_searches = db.relationship('UserSearch', back_populates='phrase', lazy='dynamic')

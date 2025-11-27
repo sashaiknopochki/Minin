@@ -243,10 +243,12 @@ def get_or_create_translations(
                 uncached_codes.append(target_code)
                 cache_status[target_lang] = "fresh"
 
-        # Step 3: Call LLM only for uncached languages
+        # Step 3: Get source_info (from phrase cache or LLM)
+        source_info = phrase.source_info_json  # Try to get from cached phrase first
+
+        # Call LLM only for uncached languages
         fresh_translations = {}
         usage_stats = None
-        source_info = None  # Will be populated from LLM call or fallback
 
         if uncached_languages:
             logger.info(
@@ -287,7 +289,15 @@ def get_or_create_translations(
             # Extract fresh translations and cache them
             fresh_translations = llm_result.get('translations', {})
             usage_stats = llm_result.get('usage')
-            source_info = llm_result.get('source_info', [text, '', ''])
+            new_source_info = llm_result.get('source_info', [text, '', ''])
+
+            # Update phrase with source_info if we got it from LLM and don't have it cached
+            if new_source_info and not phrase.source_info_json:
+                phrase.source_info_json = new_source_info
+                source_info = new_source_info  # Use the fresh source_info
+                logger.info(f"Cached source_info for phrase_id={phrase.id}: {new_source_info}")
+            elif new_source_info:
+                source_info = new_source_info  # Use fresh source_info even if we have cached
 
             # Step 4: Cache new translations
             for target_lang, target_code in zip(uncached_languages, uncached_codes):
