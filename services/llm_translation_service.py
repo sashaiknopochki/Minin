@@ -17,11 +17,13 @@ logger = logging.getLogger(__name__)
 # Model constants
 GPT_4_1_MINI = "gpt-4.1-mini"
 O4_MINI = "o4-mini"
-DEFAULT_MODEL = O4_MINI
+DEFAULT_MODEL = GPT_4_1_MINI
 
 # Models that support structured outputs
 STRUCTURED_OUTPUT_MODELS = {
     "gpt-4o-mini",
+    "gpt-4.1-mini",
+    "o4-mini",
     "gpt-4o-2024-08-06",
     "gpt-4o-2024-11-20",
     "gpt-4o",
@@ -30,8 +32,9 @@ STRUCTURED_OUTPUT_MODELS = {
 
 # Pydantic models for structured outputs
 class TranslationEntry(BaseModel):
-    """A single translation entry consisting of [word, context/meaning]."""
+    """A single translation entry consisting of [word, grammar_info, context/meaning]."""
     word: str = Field(description="The translated word or phrase")
+    grammar_info: str = Field(description="Part of speech and gender/tense information")
     context: str = Field(description="Context or meaning explanation in the native language")
 
 
@@ -42,7 +45,7 @@ class TranslationResponse(BaseModel):
     The model is dynamically created based on target_languages parameter.
     """
     translations: Dict[str, List[List[str]]] = Field(
-        description="Dictionary where keys are target language names and values are arrays of [translation, context] pairs"
+        description="Dictionary where keys are target language names and values are arrays of [translation, grammar_info, context] triplets"
     )
 
 
@@ -106,32 +109,44 @@ IMPORTANT RULES:
 3. Write ALL definitions/contexts in {native_language}, not in the target language
 4. CRITICAL: If multiple meanings translate to the EXACT SAME word in the target language, you MUST combine them into ONE entry with all meanings separated by commas. DO NOT repeat the same word multiple times.
 5. Only include translations that are actually valid in the target language - do not include meanings that don't exist in that language
+6. ALWAYS include grammatical information:
+   - For nouns: part of speech and gender if the language has genders (e.g., "существительное, женский род", "noun, masculine")
+   - For verbs: part of speech and relevant tense/form info (e.g., "глагол, прошедшее время", "verb, infinitive")
+   - For other parts of speech: include the type (adjective, adverb, etc.)
 
 Return your response as a JSON object with a "translations" field.
-Each translation should be an array with two elements: [translation, context/meaning in {native_language}].
+Each translation should be an array with THREE elements: [translation, grammar_info, context/meaning in {native_language}].
 
 Examples:
 
-CORRECT - combining repeated words:
-If translating "собака" from Russian to English with contexts in Russian:
+CORRECT - with separated grammatical information:
+If translating "кошка" from Russian to German with contexts in Russian:
 {{
   "translations": {{
-    "English": [["dog", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
+    "German": [["Katze", "существительное, женский род", "домашнее животное, самка кошачьих"]]
   }}
 }}
 
-INCORRECT - DO NOT do this:
+CORRECT - combining repeated words with grammatical info in a language that has no genders:
+If translating "собака" from Russian to English with contexts in Russian:
+{{
+  "translations": {{
+    "English": [["dog", "существительное", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
+  }}
+}}
+
+INCORRECT - DO NOT do this (wrong array length):
 {{
   "translations": {{
     "English": [["dog", "домашнее животное"], ["dog", "презрительное обозначение"], ["dog", "инструмент"]]
   }}
 }}
 
-CORRECT - different words for different meanings:
+CORRECT - different words for different meanings with grammatical info:
 If translating "bank" from English to German with contexts in Russian:
 {{
   "translations": {{
-    "German": [["Bank", "финансовое учреждение"], ["Ufer", "берег реки"], ["Böschung", "насыпь"]]
+    "German": [["Bank", "существительное, женский род", "финансовое учреждение"], ["Ufer", "существительное, средний род", "берег реки"], ["Böschung", "существительное, женский род", "насыпь"]]
   }}
 }}"""
 
@@ -163,8 +178,8 @@ If translating "bank" from English to German with contexts in Russian:
                     "items": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "minItems": 2,
-                        "maxItems": 2
+                        "minItems": 3,
+                        "maxItems": 3
                     }
                 }
 
@@ -209,7 +224,7 @@ If translating "bank" from English to German with contexts in Russian:
                 translations_dict = response_data
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse LLM response as JSON: {e}")
-            translations_dict = {target_languages[0]: [[translation_content, ""]]}
+            translations_dict = {target_languages[0]: [[translation_content, "", ""]]}
 
         logger.info(f"Translation successful. Tokens used: {response.usage.total_tokens}")
 

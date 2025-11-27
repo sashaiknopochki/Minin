@@ -20,7 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
 
 interface TranslationResult {
-  [language: string]: [string, string][];
+  [language: string]: [string, string, string][];
 }
 
 export default function HomePage() {
@@ -38,9 +38,9 @@ export default function HomePage() {
   const [text3, setText3] = useState("");
 
   // Track structured translations for each field
-  const [translations1, setTranslations1] = useState<[string, string][] | null>(null);
-  const [translations2, setTranslations2] = useState<[string, string][] | null>(null);
-  const [translations3, setTranslations3] = useState<[string, string][] | null>(null);
+  const [translations1, setTranslations1] = useState<[string, string, string][] | null>(null);
+  const [translations2, setTranslations2] = useState<[string, string, string][] | null>(null);
+  const [translations3, setTranslations3] = useState<[string, string, string][] | null>(null);
 
   // Track which field was last edited (determines source language)
   const [sourceField, setSourceField] = useState<1 | 2 | 3 | null>(null);
@@ -476,9 +476,10 @@ with AI-powered quizzes increasing active vocabulary.</p>
             {/* Translation Details */}
             {translations1 && translations1.length > 0 && (
               <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
-                {translations1.map(([word, context], index) => (
+                {translations1.map(([word, grammarInfo, context], index) => (
                   <div key={index} className="flex flex-col gap-1">
                     <div className="text-base font-medium">{word}</div>
+                    <div className="text-xs text-muted-foreground py-2">{grammarInfo}</div>
                     <div className="text-sm text-muted-foreground">{context}</div>
                   </div>
                 ))}
@@ -553,9 +554,10 @@ with AI-powered quizzes increasing active vocabulary.</p>
             {/* Translation Details */}
             {translations2 && translations2.length > 0 && (
               <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
-                {translations2.map(([word, context], index) => (
+                {translations2.map(([word, grammarInfo, context], index) => (
                   <div key={index} className="flex flex-col gap-1">
                     <div className="text-base font-medium">{word}</div>
+                    <div className="text-xs text-muted-foreground py-2">{grammarInfo}</div>
                     <div className="text-sm text-muted-foreground">{context}</div>
                   </div>
                 ))}
@@ -630,9 +632,10 @@ with AI-powered quizzes increasing active vocabulary.</p>
             {/* Translation Details */}
             {translations3 && translations3.length > 0 && (
               <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
-                {translations3.map(([word, context], index) => (
+                {translations3.map(([word, grammarInfo, context], index) => (
                   <div key={index} className="flex flex-col gap-1">
                     <div className="text-base font-medium">{word}</div>
+                    <div className="text-xs text-muted-foreground py-2">{grammarInfo}</div>
                     <div className="text-sm text-muted-foreground">{context}</div>
                   </div>
                 ))}
