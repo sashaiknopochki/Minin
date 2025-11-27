@@ -5,6 +5,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 import os
 import logging
+from services.session_service import create_session, get_active_session, end_session
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -84,6 +85,14 @@ def google_signin():
             # Log in the user with Flask-Login
             login_user(user, remember=True)
             logger.info(f'User {email} logged in successfully via GIS')
+
+            # Create a new session for the user
+            try:
+                new_session = create_session(user.id)
+                logger.info(f'Created new session {new_session.session_id} for user {email}')
+            except Exception as session_error:
+                logger.warning(f'Failed to create session for user {email}: {str(session_error)}')
+                # Don't fail login if session creation fails
 
             return jsonify({
                 'success': True,
@@ -173,6 +182,15 @@ def google_callback():
         # Log in the user
         login_user(user)
         logger.info(f'User {email} logged in successfully')
+
+        # Create a new session for the user
+        try:
+            new_session = create_session(user.id)
+            logger.info(f'Created new session {new_session.session_id} for user {email}')
+        except Exception as session_error:
+            logger.warning(f'Failed to create session for user {email}: {str(session_error)}')
+            # Don't fail login if session creation fails
+
         flash('Successfully logged in!', 'success')
 
         return redirect(url_for('home'))
@@ -272,6 +290,18 @@ def update_languages():
 def logout():
     """Log out the current user (API endpoint for frontend)"""
     user_email = current_user.email if current_user.is_authenticated else 'anonymous'
+    user_id = current_user.id if current_user.is_authenticated else None
+
+    # End the active session before logging out
+    if user_id:
+        try:
+            active_session = get_active_session(user_id)
+            if active_session:
+                end_session(active_session.session_id)
+                logger.info(f'Ended session {active_session.session_id} for user {user_email}')
+        except Exception as session_error:
+            logger.warning(f'Failed to end session for user {user_email}: {str(session_error)}')
+            # Don't fail logout if session ending fails
 
     logout_user()
 
