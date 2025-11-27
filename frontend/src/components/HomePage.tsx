@@ -365,7 +365,7 @@ export default function HomePage() {
 
       {/* ParticleFlower Animation Background - Only for logged-out users */}
       {!user && (
-        <div className="fixed left-0 w-full flex justify-center pointer-events-none z-0" style={{ top: '-96px' }}>
+        <div className="absolute left-0 w-full flex justify-center pointer-events-none z-0" style={{ top: '-96px' }}>
           <EtherealTorusFlow />
         </div>
       )}
@@ -374,10 +374,10 @@ export default function HomePage() {
       {!user && (
         <div className="w-full my-8 pt-24">
           <div className="w-full flex flex-col items-center justify-center">
-            <h2 className="w-full text-8xl font-medium text-center px-8">
+            <h2 className="w-full text-6xl md:text-7xl lg:text-8xl font-medium text-center px-8">
               Translate once.<br />Remember forever.
             </h2>
-            <p className="w-full text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
+            <p className="w-full text-lg md:text-xl lg:text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
 with AI-powered quizzes increasing active vocabulary.</p>
             <Dialog>
               <DialogTrigger asChild>
@@ -650,6 +650,60 @@ with AI-powered quizzes increasing active vocabulary.</p>
           </div>
         )}
       </main>
+
+      {/* How it works section - Only for logged-out users */}
+      {!user && (
+        <section className="w-full py-16 mt-16">
+          <h2 className="text-4xl font-medium text-left mb-12">How it works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="flex flex-col items-center text-left gap-4">
+              <div className="text-3xl font-bold text-left">1</div>
+              <p className="text-lg">Set your native language and foreign languages that you learn and use.</p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex flex-col items-center text-left gap-4">
+              <div className="text-3xl font-bold text-left">2</div>
+              <p className="text-lg">Enter a word in any language and receive a translation to your other languages.</p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex flex-col items-center text-left gap-4">
+              <div className="text-3xl font-bold text-left">3</div>
+              <p className="text-lg">Solve quizzes about the words that you have translated in order to remember them.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Problems it solves section - Only for logged-out users */}
+      {!user && (
+        <section className="w-full py-16 mt-16">
+          <h2 className="text-4xl font-medium text-left mb-12">Problems it solves</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Card 1 */}
+            <div className="flex flex-col text-left gap-4">
+              <h3 className="text-2xl font-semibold">Multi-directional Translation: <br />Stop switching translation directions.</h3>
+              <p className="text-lg">You speak one language at home, another on the street, and English at work. But your translator only shows two languages at a time. With Minin, type a word in any of your languages and instantly see translations in all the others. No more switching directions. No more juggling tabs. Just search once and see all languages that you use daily side by side.</p>
+            </div>
+
+            {/* Card 2 */}
+            <div className="flex flex-col text-left gap-4">
+              <h3 className="text-2xl font-semibold">Bookmarks don't teach you. Quizzes do: <br />Stop looking up the same words.</h3>
+              <p className="text-lg">You look up this word for the third time this month. You even saved it, but favorites lists don't help you remember — they just pile up. Minin is different. After every few searches, you get a quick and smart quiz on words you've looked up. The app tracks what you have learned, and what you keep forgetting and turns translations into lasting & active vocabulary.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Large minin branding - For all users */}
+      {!user && (
+      <section className="w-full py-0">
+        <h2 className="w-full text-[120px] md:text-[160px] lg:text-[480px] font-bold text-center">minin</h2>
+          <p className="text-lg">Designed and Developed by Sasha — <a href='http://linkedin.com/in/aleksandr.sudin'>Hire me!</a></p>
+      </section>
+      )}
     </div>
   );
 }
