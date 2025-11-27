@@ -113,38 +113,36 @@ IMPORTANT RULES:
    - For nouns: part of speech and gender if the language has genders (e.g., "существительное, женский род", "noun, masculine")
    - For verbs: part of speech and relevant tense/form info (e.g., "глагол, прошедшее время", "verb, infinitive")
    - For other parts of speech: include the type (adjective, adverb, etc.)
+7. ALSO provide grammatical analysis of the SOURCE word itself in a "source_info" field
 
-Return your response as a JSON object with a "translations" field.
+Return your response as a JSON object with "translations" and "source_info" fields.
 Each translation should be an array with THREE elements: [translation, grammar_info, context/meaning in {native_language}].
+The "source_info" field should be an array with THREE elements: [source_word, grammar_info, context/meaning in {native_language}].
 
 Examples:
 
-CORRECT - with separated grammatical information:
+CORRECT - with source_info included:
 If translating "кошка" from Russian to German with contexts in Russian:
 {{
+  "source_info": ["кошка", "существительное, женский род", "домашнее животное, самка кошачьих"],
   "translations": {{
     "German": [["Katze", "существительное, женский род", "домашнее животное, самка кошачьих"]]
   }}
 }}
 
-CORRECT - combining repeated words with grammatical info in a language that has no genders:
+CORRECT - combining repeated words with grammatical info:
 If translating "собака" from Russian to English with contexts in Russian:
 {{
+  "source_info": ["собака", "существительное, мужской род", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"],
   "translations": {{
     "English": [["dog", "существительное", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
-  }}
-}}
-
-INCORRECT - DO NOT do this (wrong array length):
-{{
-  "translations": {{
-    "English": [["dog", "домашнее животное"], ["dog", "презрительное обозначение"], ["dog", "инструмент"]]
   }}
 }}
 
 CORRECT - different words for different meanings with grammatical info:
 If translating "bank" from English to German with contexts in Russian:
 {{
+  "source_info": ["bank", "существительное", "финансовое учреждение, берег реки, инструмент для захвата"],
   "translations": {{
     "German": [["Bank", "существительное, женский род", "финансовое учреждение"], ["Ufer", "существительное, средний род", "берег реки"], ["Böschung", "существительное, женский род", "насыпь"]]
   }}
@@ -189,6 +187,12 @@ If translating "bank" from English to German with contexts in Russian:
                 "schema": {
                     "type": "object",
                     "properties": {
+                        "source_info": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 3,
+                            "maxItems": 3
+                        },
                         "translations": {
                             "type": "object",
                             "properties": language_properties,
@@ -196,7 +200,7 @@ If translating "bank" from English to German with contexts in Russian:
                             "additionalProperties": False
                         }
                     },
-                    "required": ["translations"],
+                    "required": ["source_info", "translations"],
                     "additionalProperties": False
                 }
             }
@@ -218,6 +222,7 @@ If translating "bank" from English to German with contexts in Russian:
         try:
             response_data = json.loads(translation_content)
             translations_dict = response_data.get("translations", {})
+            source_info = response_data.get("source_info", [text, "", ""])
 
             # Fallback if translations not in expected format
             if not translations_dict and isinstance(response_data, dict):
@@ -225,6 +230,7 @@ If translating "bank" from English to German with contexts in Russian:
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse LLM response as JSON: {e}")
             translations_dict = {target_languages[0]: [[translation_content, "", ""]]}
+            source_info = [text, "", ""]
 
         logger.info(f"Translation successful. Tokens used: {response.usage.total_tokens}")
 
@@ -234,6 +240,7 @@ If translating "bank" from English to German with contexts in Russian:
             "source_language": source_language,
             "target_languages": target_languages,
             "native_language": native_language,
+            "source_info": source_info,
             "translations": translations_dict,
             "model": model,
             "usage": {

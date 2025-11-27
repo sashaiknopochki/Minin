@@ -144,7 +144,10 @@ export default function HomePage() {
       const data = await response.json();
 
       if (data.success) {
-        return data.translations;
+        return {
+          translations: data.translations,
+          source_info: data.source_info
+        };
       } else {
         setTranslationError(data.error || "Translation failed");
         return null;
@@ -207,9 +210,11 @@ export default function HomePage() {
           ? [lang1, lang3]
           : [lang1, lang2];
 
-      const translations = await translateText(value, sourceLang, targetLangs);
+      const result = await translateText(value, sourceLang, targetLangs);
 
-      if (translations) {
+      if (result) {
+        const { translations, source_info } = result;
+
         // Extract first translation for textarea
         const targetLangNames = targetLangs.map(getLanguageName);
         const translatedTexts = targetLangNames.map((langName) => {
@@ -226,22 +231,28 @@ export default function HomePage() {
           return translation || [];
         });
 
-        // Update target fields
+        // Wrap source_info in an array to match the translation structure
+        const sourceInfoArray = source_info ? [source_info] : null;
+
+        // Update target fields and source field
         if (fieldNumber === 1) {
           setText2(translatedTexts[0]);
           setText3(translatedTexts[1]);
+          setTranslations1(sourceInfoArray);  // Show source info on field 1
           setTranslations2(structuredTranslations[0]);
           setTranslations3(structuredTranslations[1]);
         } else if (fieldNumber === 2) {
           setText1(translatedTexts[0]);
           setText3(translatedTexts[1]);
           setTranslations1(structuredTranslations[0]);
+          setTranslations2(sourceInfoArray);  // Show source info on field 2
           setTranslations3(structuredTranslations[1]);
         } else {
           setText1(translatedTexts[0]);
           setText2(translatedTexts[1]);
           setTranslations1(structuredTranslations[0]);
           setTranslations2(structuredTranslations[1]);
+          setTranslations3(sourceInfoArray);  // Show source info on field 3
         }
       }
     }, 1000);
@@ -475,11 +486,11 @@ with AI-powered quizzes increasing active vocabulary.</p>
 
             {/* Translation Details */}
             {translations1 && translations1.length > 0 && (
-              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
+              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
                 {translations1.map(([word, grammarInfo, context], index) => (
-                  <div key={index} className="flex flex-col gap-1">
+                  <div key={index} className="flex flex-col gap-2">
                     <div className="text-base font-medium">{word}</div>
-                    <div className="text-xs text-muted-foreground py-2">{grammarInfo}</div>
+                    <div className="text-xs text-muted-foreground">{grammarInfo}</div>
                     <div className="text-sm text-muted-foreground">{context}</div>
                   </div>
                 ))}
@@ -553,11 +564,11 @@ with AI-powered quizzes increasing active vocabulary.</p>
 
             {/* Translation Details */}
             {translations2 && translations2.length > 0 && (
-              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
+              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
                 {translations2.map(([word, grammarInfo, context], index) => (
-                  <div key={index} className="flex flex-col gap-1">
+                  <div key={index} className="flex flex-col gap-2">
                     <div className="text-base font-medium">{word}</div>
-                    <div className="text-xs text-muted-foreground py-2">{grammarInfo}</div>
+                    <div className="text-xs text-muted-foreground">{grammarInfo}</div>
                     <div className="text-sm text-muted-foreground">{context}</div>
                   </div>
                 ))}
@@ -631,11 +642,11 @@ with AI-powered quizzes increasing active vocabulary.</p>
 
             {/* Translation Details */}
             {translations3 && translations3.length > 0 && (
-              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left">
+              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
                 {translations3.map(([word, grammarInfo, context], index) => (
-                  <div key={index} className="flex flex-col gap-1">
+                  <div key={index} className="flex flex-col gap-2">
                     <div className="text-base font-medium">{word}</div>
-                    <div className="text-xs text-muted-foreground py-2">{grammarInfo}</div>
+                    <div className="text-xs text-muted-foreground">{grammarInfo}</div>
                     <div className="text-sm text-muted-foreground">{context}</div>
                   </div>
                 ))}
