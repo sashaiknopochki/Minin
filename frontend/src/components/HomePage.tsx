@@ -32,6 +32,7 @@ import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import History from "@/pages/History";
 
 interface TranslationResult {
   [language: string]: [string, string, string][];
@@ -518,9 +519,21 @@ with AI-powered quizzes increasing active vocabulary.</p>
         </div>
       )}
 
-      {/* Main Content - Language Inputs */}
+      {/* Main Content - Conditional based on active page */}
       <main className="w-full pt-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        {activePage === 'history' ? (
+          <History />
+        ) : activePage === 'learn' ? (
+          <div className="w-full py-8">
+            <h1 className="text-4xl font-bold mb-8">Learn</h1>
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <p className="text-lg text-muted-foreground text-center">
+                Quiz feature coming soon! Practice vocabulary from your search history.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* First Input */}
           <div className="flex flex-col gap-6">
             {user ? (
@@ -754,10 +767,11 @@ with AI-powered quizzes increasing active vocabulary.</p>
               </div>
             )}
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Error Message */}
-        {translationError && (
+        {activePage === 'translate' && translationError && (
           <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
             <p className="text-sm text-destructive">
               Translation error: {translationError}
