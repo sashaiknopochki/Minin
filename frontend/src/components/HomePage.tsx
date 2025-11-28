@@ -17,13 +17,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import UserMenu from "@/components/UserMenu";
 import ParticleFlower from "@/components/ParticleFlower";
 import EtherealTorusFlow from "@/components/EtherealTorusFlow";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Loader2, Copy, Check } from "lucide-react";
+import { X, Loader2, Copy, Check, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TranslationResult {
@@ -61,6 +68,9 @@ export default function HomePage() {
 
   // Track active navigation page
   const [activePage, setActivePage] = useState<'translate' | 'learn' | 'history'>('translate');
+
+  // Track mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -331,10 +341,67 @@ export default function HomePage() {
       {/* Header */}
       <header className="w-full py-3">
         <div className="flex items-center justify-between">
-          {/* Logo and Navigation */}
-          <div className="flex items-baseline gap-4 sm:gap-6 md:gap-10">
-            <h1 className="text-4xl font-bold text-foreground">minin</h1>
+          {/* Mobile Menu Button (left side, visible only on mobile) */}
+          <div className="md:hidden">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 h-full">
+                <SheetHeader>
+                  <SheetTitle>minin</SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-4 mt-8">
+                  <button
+                    onClick={() => {
+                      setActivePage('translate');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                      activePage === 'translate' && "font-bold"
+                    )}
+                  >
+                    Translate
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActivePage('learn');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                      activePage === 'learn' && "font-bold"
+                    )}
+                  >
+                    Learn
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActivePage('history');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                      activePage === 'history' && "font-bold"
+                    )}
+                  >
+                    History
+                  </button>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
 
+          {/* Logo (centered between menu and auth) */}
+          <div className="flex-1 md:flex-none flex justify-center md:justify-start">
+            <h1 className="text-4xl font-bold text-foreground">minin</h1>
+          </div>
+
+          {/* Desktop Navigation (hidden on mobile, visible on desktop) */}
+          <div className="hidden md:flex items-baseline gap-4 lg:gap-6 flex-1 justify-center">
             <NavigationMenu>
               <NavigationMenuList className="gap-1">
                 <NavigationMenuItem>
