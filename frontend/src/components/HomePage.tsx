@@ -2,7 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +24,7 @@ import EtherealTorusFlow from "@/components/EtherealTorusFlow";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TranslationResult {
   [language: string]: [string, string, string][];
@@ -51,6 +58,9 @@ export default function HomePage() {
 
   // Track copied state
   const [copiedField, setCopiedField] = useState<1 | 2 | 3 | null>(null);
+
+  // Track active navigation page
+  const [activePage, setActivePage] = useState<'translate' | 'learn' | 'history'>('translate');
 
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -325,22 +335,46 @@ export default function HomePage() {
           <div className="flex items-baseline gap-4 sm:gap-6 md:gap-10">
             <h1 className="text-4xl font-bold text-foreground">minin</h1>
 
-            <Tabs defaultValue="translate" className="w-auto">
-              <TabsList className="h-auto bg-transparent p-0 gap-1">
-                <TabsTrigger
-                  value="translate"
-                  className="px-4 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:font-bold"
-                >
-                  Translate
-                </TabsTrigger>
-                <TabsTrigger
-                  value="learn"
-                  className="px-4 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                >
-                  Learn
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <NavigationMenu>
+              <NavigationMenuList className="gap-1">
+                <NavigationMenuItem>
+                  <NavigationMenuLink
+                    onClick={() => setActivePage('translate')}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "cursor-pointer bg-transparent",
+                      activePage === 'translate' && "font-bold"
+                    )}
+                  >
+                    Translate
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink
+                    onClick={() => setActivePage('learn')}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "cursor-pointer bg-transparent",
+                      activePage === 'learn' && "font-bold"
+                    )}
+                  >
+                    Learn
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink
+                    onClick={() => setActivePage('history')}
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "cursor-pointer bg-transparent",
+                      activePage === 'history' && "font-bold"
+                    )}
+                  >
+                    History
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
           </div>
 
           {/* Authentication - Show either Sign In or User Menu */}
@@ -374,7 +408,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ParticleFlower Animation Background - Only for logged-out users */}
+      {/* EtherealTorusFlow Animation Background - Only for logged-out users */}
       {!user && (
         <div className="absolute left-0 w-full flex justify-center pointer-events-none z-0" style={{ top: '-96px' }}>
           <EtherealTorusFlow />

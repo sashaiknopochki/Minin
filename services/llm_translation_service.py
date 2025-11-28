@@ -107,7 +107,11 @@ IMPORTANT RULES:
 1. Do NOT include {source_language} in your translations (since that's the source language)
 2. Provide ALL possible meanings and definitions for each translation
 3. Write ALL definitions/contexts in {native_language}, not in the target language
-4. CRITICAL: If multiple meanings translate to the EXACT SAME word in the target language, you MUST combine them into ONE entry with all meanings separated by commas. DO NOT repeat the same word multiple times.
+4. CRITICAL RULE - When to create separate vs combined entries:
+   - If translations are DIFFERENT WORDS (e.g., "снимать" → "take off", "lose weight", "accept"), create SEPARATE entries for each word
+   - If translations are the EXACT SAME WORD with different meanings (e.g., "собака" → "dog" (animal), "dog" (insult)), create ONE entry with combined contexts
+   - Example CORRECT: [["take off", "verb", "remove clothing"], ["lose weight", "verb phrase", "reduce body mass"], ["accept", "verb", "agree to take"]]
+   - Example WRONG: [["take off, lose weight, accept", "verb", "various meanings"]] ← DO NOT DO THIS
 5. Only include translations that are actually valid in the target language - do not include meanings that don't exist in that language
 6. ALWAYS include grammatical information:
    - For nouns: part of speech and gender if the language has genders (e.g., "существительное, женский род", "noun, masculine")
@@ -142,9 +146,29 @@ If translating "собака" from Russian to English with contexts in Russian:
 CORRECT - different words for different meanings with grammatical info:
 If translating "bank" from English to German with contexts in Russian:
 {{
-  "source_info": ["bank", "существительное", "финансовое учреждение, берег реки, инструмент для захвата"],
+  "source_info": ["bank", "существительное", "финансовое учреждение, берег реки"],
   "translations": {{
     "German": [["Bank", "существительное, женский род", "финансовое учреждение"], ["Ufer", "существительное, средний род", "берег реки"], ["Böschung", "существительное, женский род", "насыпь"]]
+  }}
+}}
+
+CORRECT - different words must be separate entries:
+If translating "снимать" from Russian to English with contexts in Russian:
+{{
+  "source_info": ["снимать", "глагол, инфинитив", "убирать что-либо, уменьшать вес, брать обязанности"],
+  "translations": {{
+    "English": [
+      ["take off", "verb, infinitive", "снимать что-либо, убирать"],
+      ["lose weight", "verb phrase", "уменьшать вес тела"],
+      ["accept", "verb", "брать на себя обязанности, принимать"]
+    ]
+  }}
+}}
+
+WRONG - DO NOT combine different words:
+{{
+  "translations": {{
+    "English": [["take off, lose weight, accept", "verb", "various meanings"]]
   }}
 }}"""
 
