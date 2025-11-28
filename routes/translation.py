@@ -5,6 +5,7 @@ from services.user_search_service import log_user_search
 from services.session_service import get_or_create_session
 from services.language_utils import get_language_code
 from services.phrase_translation_service import get_or_create_translations
+from services.learning_progress_service import initialize_learning_progress_on_search
 
 bp = Blueprint('translation', __name__, url_prefix='/translation')
 
@@ -128,7 +129,7 @@ def translate():
                 }
 
                 context_sentence = data.get('context_sentence')  # Optional context
-                log_user_search(
+                user_search = log_user_search(
                     user_id=current_user.id,
                     phrase_text=text,
                     source_language_code=source_language_code,
@@ -136,6 +137,21 @@ def translate():
                     session_id=session.session_id,
                     context_sentence=context_sentence
                 )
+
+                # Initialize learning progress if this is the user's first search for this phrase
+                if user_search:
+                    try:
+                        # Get the phrase from the user_search to check if it's quizzable
+                        phrase = user_search.phrase
+                        initialize_learning_progress_on_search(
+                            user_id=current_user.id,
+                            phrase_id=user_search.phrase_id,
+                            is_quizzable=phrase.is_quizzable
+                        )
+                    except Exception as progress_error:
+                        # Log error but don't fail the request
+                        print(f"Failed to initialize learning progress: {str(progress_error)}")
+
             except Exception as e:
                 # Log error but don't fail the request
                 print(f"Failed to log user search: {str(e)}")

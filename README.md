@@ -13,6 +13,7 @@ A smart language learning web application that combines multi-language translati
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Database Management](#database-management)
 - [Database Schema](#database-schema)
 - [API Endpoints](#api-endpoints)
 - [Development Roadmap](#development-roadmap)
@@ -117,10 +118,19 @@ A smart language learning web application that combines multi-language translati
 
 5. **Initialize the database**
    ```bash
+   # Initialize Flask-Migrate (first time only)
    flask db init
-   flask db migrate
+
+   # Create and apply migrations
+   flask db migrate -m "Initial migration"
    flask db upgrade
+
+   # ⚠️ CRITICAL: Populate the languages table with all 58 supported languages
+   # ALWAYS use this script - DO NOT create custom seed scripts!
+   python populate_languages.py
    ```
+
+   **Important**: The `populate_languages.py` script is the **ONLY** correct way to populate the languages table. It contains **58 supported languages** with native script names (not 20). Never delete the database without backing it up, and never create custom seed scripts.
 
 6. **Run the application**
    ```bash
@@ -160,6 +170,83 @@ DATABASE_URL=sqlite:///minin.db
 # Application Settings
 DEFAULT_LANGUAGES=en,de,ru
 QUIZ_FREQUENCY=5  # Show quiz after every N word searches
+```
+
+---
+
+## Database Management
+
+### ⚠️ CRITICAL: Language Population
+
+The application supports **58 languages** with native script names. You **MUST** use the provided `populate_languages.py` script to populate the languages table.
+
+**DO NOT:**
+- ❌ Create custom seed scripts
+- ❌ Delete the database without backing it up first
+- ❌ Manually populate with a subset of languages
+- ❌ Skip running `populate_languages.py` after database initialization
+
+**Correct Usage:**
+
+```bash
+# After creating database and running migrations
+python populate_languages.py
+```
+
+The script populates **58 languages** including:
+- Afrikaans, Amharic, Arabic, Armenian, Azerbaijani
+- Belarusian, Bengali
+- Chinese (Simplified), Chinese (Traditional), Czech, Danish, Dutch
+- English, Estonian
+- Finnish, French
+- Georgian, German, Greek, Gujarati
+- Hausa, Hebrew, Hindi, Hungarian
+- Indonesian, Italian
+- Japanese
+- Kannada, Kazakh, Korean, Kyrgyz
+- Latvian, Lithuanian
+- Malayalam
+- Norwegian
+- Persian, Polish, Portuguese
+- Romanian, Russian
+- Serbian, Somali, Spanish, Swahili, Swedish
+- Tajik, Tamil, Telugu, Thai, Turkish, Turkmen
+- Ukrainian, Urdu, Uzbek
+- Vietnamese
+- Xhosa
+- Yoruba
+- Zulu
+
+### Database Migrations
+
+When modifying models:
+
+```bash
+# Create a new migration
+flask db migrate -m "Description of changes"
+
+# Review the generated migration in migrations/versions/
+
+# Apply the migration
+flask db upgrade
+
+# Rollback if needed
+flask db downgrade
+```
+
+### Database Location
+
+- **Development**: `instance/database.db` (SQLite)
+- **Production**: Configure `DATABASE_URL` in `.env`
+
+### Backup and Restore
+
+```bash
+# Backup
+cp instance/database.db instance/database.backup.db
+
+# Restore
+cp instance/database.backup.db instance/database.db
 ```
 
 ---

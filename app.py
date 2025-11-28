@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 from flask_login import LoginManager
 from flask_cors import CORS
+from flask_migrate import Migrate
 from config import config
 import os
 
@@ -23,6 +24,9 @@ def create_app(config_name=None):
     # Initialize SQLAlchemy
     from models import db
     db.init_app(app)
+
+    # Initialize Flask-Migrate
+    migrate = Migrate(app, db)
 
     # Initialize Flask-Login
     login_manager = LoginManager()
