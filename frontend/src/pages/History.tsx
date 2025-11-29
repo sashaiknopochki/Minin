@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Pagination,
   PaginationContent,
@@ -58,8 +59,9 @@ export default function History() {
   const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
 
-  // Get current page from URL or default to 1
+  // Get current page and language filter from URL
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
+  const selectedLanguage = searchParams.get("language") || "all";
 
   // Get user's active languages for column headers
   const userLanguages = user?.translator_languages || [];
@@ -75,7 +77,13 @@ export default function History() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/history?page=${currentPage}`, {
+        // Build URL with pagination and optional language filter
+        let url = `/api/history?page=${currentPage}`;
+        if (selectedLanguage !== "all") {
+          url += `&language_code=${selectedLanguage}`;
+        }
+
+        const response = await fetch(url, {
           method: "GET",
           credentials: "include",
         });
@@ -99,11 +107,24 @@ export default function History() {
     } else {
       setLoading(false);
     }
-  }, [user, currentPage]);
+  }, [user, currentPage, selectedLanguage]);
 
   // Handle page change
   const handlePageChange = (newPage: number) => {
-    setSearchParams({ page: newPage.toString() });
+    const params: Record<string, string> = { page: newPage.toString() };
+    if (selectedLanguage !== "all") {
+      params.language = selectedLanguage;
+    }
+    setSearchParams(params);
+  };
+
+  // Handle language filter change (resets to page 1)
+  const handleLanguageChange = (language: string) => {
+    const params: Record<string, string> = { page: "1" };
+    if (language !== "all") {
+      params.language = language;
+    }
+    setSearchParams(params);
   };
 
   // Handle delete
@@ -201,121 +222,146 @@ export default function History() {
     );
   }
 
-  // Empty state
-  if (historyData.length === 0) {
-    return (
-      <div className="w-full py-8">
-        <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
-        <div className="flex flex-col items-center justify-center py-16 px-4">
-          <p className="text-lg text-muted-foreground text-center">
-            No search history yet. Start translating to build your history!
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Empty state - still show filter if user is logged in
+  const isEmpty = historyData.length === 0;
 
   return (
     <div className="w-full py-8">
       {/* Page Title */}
       <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
 
-      {/* Table Container - Responsive with horizontal scroll */}
-      <div className="w-full overflow-x-auto rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {/* Dynamic language columns */}
-              {allLanguages.slice(0, 3).map((langCode) => (
-                <TableHead key={langCode} className="min-w-[150px]">
-                  {getLanguageName(langCode)}
-                </TableHead>
-              ))}
-
-              {/* Additional columns for desktop - hidden on mobile */}
-              {allLanguages.slice(3).map((langCode) => (
-                <TableHead key={langCode} className="min-w-[150px] hidden md:table-cell">
-                  {getLanguageName(langCode)}
-                </TableHead>
-              ))}
-
-              {/* Date column */}
-              <TableHead className="min-w-[120px]">Date</TableHead>
-
-              {/* Delete column */}
-              <TableHead className="w-[80px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {historyData.map((item) => {
-              const sourceLanguage = item.phrase.language_code;
-
-              return (
-                <TableRow key={item.id}>
-                  {/* Dynamic language columns */}
-                  {allLanguages.slice(0, 3).map((langCode) => {
-                    const isSourceLanguage = langCode === sourceLanguage;
-                    const text = isSourceLanguage
-                      ? item.phrase.text
-                      : item.translations[langCode] || "-";
-
-                    return (
-                      <TableCell
-                        key={langCode}
-                        className={isSourceLanguage ? "font-bold" : ""}
-                      >
-                        {text}
-                      </TableCell>
-                    );
-                  })}
-
-                  {/* Additional columns for desktop */}
-                  {allLanguages.slice(3).map((langCode) => {
-                    const isSourceLanguage = langCode === sourceLanguage;
-                    const text = isSourceLanguage
-                      ? item.phrase.text
-                      : item.translations[langCode] || "-";
-
-                    return (
-                      <TableCell
-                        key={langCode}
-                        className={`hidden md:table-cell ${isSourceLanguage ? "font-bold" : ""}`}
-                      >
-                        {text}
-                      </TableCell>
-                    );
-                  })}
-
-                  {/* Date column */}
-                  <TableCell className="text-sm text-muted-foreground text-left">
-                    {formatDate(item.searched_at)}
-                  </TableCell>
-
-                  {/* Delete button */}
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(item.id)}
-                      disabled={deletingIds.has(item.id)}
-                      className="h-8 w-8"
-                    >
-                      {deletingIds.has(item.id) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+      {/* Language Filter */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground mr-2">Filter by language:</span>
+          <ButtonGroup>
+            <Button
+              variant={selectedLanguage === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleLanguageChange("all")}
+            >
+              All languages
+            </Button>
+            {allLanguages.map((langCode) => (
+              <Button
+                key={langCode}
+                variant={selectedLanguage === langCode ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleLanguageChange(langCode)}
+              >
+                {getLanguageName(langCode)}
+              </Button>
+            ))}
+          </ButtonGroup>
+        </div>
       </div>
 
+      {/* Table Container or Empty State */}
+      {isEmpty ? (
+        <div className="w-full rounded-md border py-16 px-4">
+          <p className="text-lg text-muted-foreground text-center">
+            {selectedLanguage !== "all"
+              ? `No search history for ${getLanguageName(selectedLanguage)}. Try selecting a different language.`
+              : "No search history yet. Start translating to build your history!"}
+          </p>
+        </div>
+      ) : (
+        <div className="w-full overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {/* Dynamic language columns */}
+                {allLanguages.slice(0, 3).map((langCode) => (
+                  <TableHead key={langCode} className="min-w-[150px]">
+                    {getLanguageName(langCode)}
+                  </TableHead>
+                ))}
+
+                {/* Additional columns for desktop - hidden on mobile */}
+                {allLanguages.slice(3).map((langCode) => (
+                  <TableHead key={langCode} className="min-w-[150px] hidden md:table-cell">
+                    {getLanguageName(langCode)}
+                  </TableHead>
+                ))}
+
+                {/* Date column */}
+                <TableHead className="min-w-[120px]">Date</TableHead>
+
+                {/* Delete column */}
+                <TableHead className="w-[80px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {historyData.map((item) => {
+                const sourceLanguage = item.phrase.language_code;
+
+                return (
+                  <TableRow key={item.id}>
+                    {/* Dynamic language columns */}
+                    {allLanguages.slice(0, 3).map((langCode) => {
+                      const isSourceLanguage = langCode === sourceLanguage;
+                      const text = isSourceLanguage
+                        ? item.phrase.text
+                        : item.translations[langCode] || "-";
+
+                      return (
+                        <TableCell
+                          key={langCode}
+                          className={isSourceLanguage ? "font-bold" : ""}
+                        >
+                          {text}
+                        </TableCell>
+                      );
+                    })}
+
+                    {/* Additional columns for desktop */}
+                    {allLanguages.slice(3).map((langCode) => {
+                      const isSourceLanguage = langCode === sourceLanguage;
+                      const text = isSourceLanguage
+                        ? item.phrase.text
+                        : item.translations[langCode] || "-";
+
+                      return (
+                        <TableCell
+                          key={langCode}
+                          className={`hidden md:table-cell ${isSourceLanguage ? "font-bold" : ""}`}
+                        >
+                          {text}
+                        </TableCell>
+                      );
+                    })}
+
+                    {/* Date column */}
+                    <TableCell className="text-sm text-muted-foreground text-left">
+                      {formatDate(item.searched_at)}
+                    </TableCell>
+
+                    {/* Delete button */}
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deletingIds.has(item.id)}
+                        className="h-8 w-8"
+                      >
+                        {deletingIds.has(item.id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
       {/* Pagination and Result Count */}
-      {pagination && (
+      {pagination && !isEmpty && (
         <div className="mt-6 space-y-4">
           {/* Result count display */}
           <div className="text-sm text-muted-foreground text-center">

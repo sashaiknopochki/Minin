@@ -49,6 +49,7 @@ def get_history():
 
     Query params:
         - page: Page number (default: 1)
+        - language_code: Filter by phrase language (optional, e.g., 'de', 'en')
 
     Returns:
         JSON object with searches array containing:
@@ -66,17 +67,25 @@ def get_history():
                 'error': 'User not authenticated'
             }), 401
 
-        # Get page param from query string (fixed at 100 per page)
+        # Get query params
         page = request.args.get('page', 1, type=int)
+        language_code = request.args.get('language_code', None, type=str)
         per_page = 100
 
         # Ensure page is at least 1
         page = max(page, 1)
 
-        # Query user searches with phrase join, ordered by most recent first
-        pagination = (UserSearch.query
-                      .filter_by(user_id=current_user.id)
-                      .join(Phrase)
+        # Build query with optional language filter
+        query = (UserSearch.query
+                 .filter_by(user_id=current_user.id)
+                 .join(Phrase))
+
+        # Add language filter if provided
+        if language_code:
+            query = query.filter(Phrase.language_code == language_code)
+
+        # Apply ordering and pagination
+        pagination = (query
                       .order_by(UserSearch.searched_at.desc())
                       .paginate(page=page, per_page=per_page, error_out=False))
 
