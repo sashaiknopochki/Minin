@@ -121,11 +121,20 @@ export default function History() {
     return languageNames[code] || code.toUpperCase();
   };
 
+  // Format date as DD.MM.YYYY
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  };
+
   // Loading state
   if (loading) {
     return (
       <div className="w-full py-8">
-        <h1 className="text-4xl font-bold mb-8">Search History</h1>
+        <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <p className="text-lg text-muted-foreground text-center mt-4">
@@ -140,7 +149,7 @@ export default function History() {
   if (!user) {
     return (
       <div className="w-full py-8">
-        <h1 className="text-4xl font-bold mb-8">Search History</h1>
+        <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <p className="text-lg text-muted-foreground text-center">
             Please sign in to view your search history.
@@ -154,7 +163,7 @@ export default function History() {
   if (error) {
     return (
       <div className="w-full py-8">
-        <h1 className="text-4xl font-bold mb-8">Search History</h1>
+        <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <p className="text-lg text-destructive text-center">
             {error}
@@ -168,7 +177,7 @@ export default function History() {
   if (historyData.length === 0) {
     return (
       <div className="w-full py-8">
-        <h1 className="text-4xl font-bold mb-8">Search History</h1>
+        <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <p className="text-lg text-muted-foreground text-center">
             No search history yet. Start translating to build your history!
@@ -181,7 +190,7 @@ export default function History() {
   return (
     <div className="w-full py-8">
       {/* Page Title */}
-      <h1 className="text-4xl font-bold mb-8">Search History</h1>
+      <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
 
       {/* Table Container - Responsive with horizontal scroll */}
       <div className="w-full overflow-x-auto rounded-md border">
@@ -250,8 +259,8 @@ export default function History() {
                   })}
 
                   {/* Date column */}
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(item.searched_at).toLocaleDateString()}
+                  <TableCell className="text-sm text-muted-foreground text-left">
+                    {formatDate(item.searched_at)}
                   </TableCell>
 
                   {/* Delete button */}
