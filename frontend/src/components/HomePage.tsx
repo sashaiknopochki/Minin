@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,21 +11,12 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import GoogleSignInButton from "@/components/GoogleSignInButton";
 import UserMenu from "@/components/UserMenu";
 import ParticleFlower from "@/components/ParticleFlower";
 import EtherealTorusFlow from "@/components/EtherealTorusFlow";
@@ -40,7 +32,8 @@ interface TranslationResult {
 
 export default function HomePage() {
   const { languages, loading: languagesLoading, error: languagesError } = useLanguageContext();
-  const { user, login } = useAuth();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Track selected language for each input
   const [lang1, setLang1] = useState("ru");
@@ -310,33 +303,6 @@ export default function HomePage() {
     }
   };
 
-  // Handle Google Sign-In success
-  const handleGoogleSignIn = async (response: google.accounts.id.CredentialResponse) => {
-    try {
-      const result = await fetch("/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ credential: response.credential }),
-      });
-
-      const data = await result.json();
-
-      if (data.success && data.user) {
-        login(data.user);
-      } else {
-        console.error("Sign-in failed:", data.error);
-      }
-    } catch (error) {
-      console.error("Sign-in error:", error);
-    }
-  };
-
-  // Handle Google Sign-In error
-  const handleGoogleSignInError = () => {
-    console.error("Google Sign-In failed");
-  };
-
   return (
     <div>
       {/* Header */}
@@ -449,29 +415,12 @@ export default function HomePage() {
           {user ? (
             <UserMenu />
           ) : (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="h-9 px-4 py-2 shadow-sm">
-                  Sign In
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold leading-7">
-                    Welcome to Minin
-                  </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground leading-5">
-                    'Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.'
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-2 w-full">
-                  <GoogleSignInButton
-                    onSuccess={handleGoogleSignIn}
-                    onError={handleGoogleSignInError}
-                  />
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button
+              onClick={() => navigate("/login")}
+              className="h-9 px-4 py-2 shadow-sm"
+            >
+              Sign In
+            </Button>
           )}
         </div>
       </header>
@@ -492,29 +441,12 @@ export default function HomePage() {
             </h2>
             <p className="w-full text-lg md:text-xl lg:text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
 with AI-powered quizzes increasing active vocabulary.</p>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="h-9 px-4 py-2 shadow-sm">
-                  Get Started
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold leading-7">
-                    Welcome to Minin
-                  </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground leading-5">
-                    'Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.'
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-2 w-full">
-                  <GoogleSignInButton
-                    onSuccess={handleGoogleSignIn}
-                    onError={handleGoogleSignInError}
-                  />
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button
+              onClick={() => navigate("/login")}
+              className="h-9 px-4 py-2 shadow-sm"
+            >
+              Get Started
+            </Button>
           </div>
         </div>
       )}

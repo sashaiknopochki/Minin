@@ -1,6 +1,8 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import HomePage from './components/HomePage'
 import LanguageSetup from './components/LanguageSetup'
+import Login from './pages/Login'
 import './App.css'
 
 function App() {
@@ -22,7 +24,15 @@ function App() {
     return <LanguageSetup />
   }
 
-  return <HomePage />
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default App
