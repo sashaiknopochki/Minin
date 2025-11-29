@@ -59,9 +59,10 @@ export default function History() {
   const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
 
-  // Get current page and language filter from URL
+  // Get current page, language filter, and stage filter from URL
   const currentPage = parseInt(searchParams.get("page") || "1", 10);
   const selectedLanguage = searchParams.get("language") || "all";
+  const selectedStage = searchParams.get("stage") || "all";
 
   // Get user's active languages for column headers
   const userLanguages = user?.translator_languages || [];
@@ -77,10 +78,13 @@ export default function History() {
         setLoading(true);
         setError(null);
 
-        // Build URL with pagination and optional language filter
+        // Build URL with pagination and optional filters
         let url = `/api/history?page=${currentPage}`;
         if (selectedLanguage !== "all") {
           url += `&language_code=${selectedLanguage}`;
+        }
+        if (selectedStage !== "all") {
+          url += `&stage=${selectedStage}`;
         }
 
         const response = await fetch(url, {
@@ -107,13 +111,16 @@ export default function History() {
     } else {
       setLoading(false);
     }
-  }, [user, currentPage, selectedLanguage]);
+  }, [user, currentPage, selectedLanguage, selectedStage]);
 
   // Handle page change
   const handlePageChange = (newPage: number) => {
     const params: Record<string, string> = { page: newPage.toString() };
     if (selectedLanguage !== "all") {
       params.language = selectedLanguage;
+    }
+    if (selectedStage !== "all") {
+      params.stage = selectedStage;
     }
     setSearchParams(params);
   };
@@ -123,6 +130,21 @@ export default function History() {
     const params: Record<string, string> = { page: "1" };
     if (language !== "all") {
       params.language = language;
+    }
+    if (selectedStage !== "all") {
+      params.stage = selectedStage;
+    }
+    setSearchParams(params);
+  };
+
+  // Handle stage filter change (resets to page 1)
+  const handleStageChange = (stage: string) => {
+    const params: Record<string, string> = { page: "1" };
+    if (selectedLanguage !== "all") {
+      params.language = selectedLanguage;
+    }
+    if (stage !== "all") {
+      params.stage = stage;
     }
     setSearchParams(params);
   };
@@ -230,8 +252,9 @@ export default function History() {
       {/* Page Title */}
       <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
 
-      {/* Language Filter */}
-      <div className="mb-6">
+      {/* Filters */}
+      <div className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-4">
+        {/* Language Filter */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground mr-2">Filter by language:</span>
           <ButtonGroup>
@@ -252,6 +275,34 @@ export default function History() {
                 {getLanguageName(langCode)}
               </Button>
             ))}
+          </ButtonGroup>
+        </div>
+
+        {/* Stage Filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground mr-2">Filter by stage:</span>
+          <ButtonGroup>
+            <Button
+              variant={selectedStage === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleStageChange("all")}
+            >
+              All
+            </Button>
+            <Button
+              variant={selectedStage === "in_progress" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleStageChange("in_progress")}
+            >
+              In Progress
+            </Button>
+            <Button
+              variant={selectedStage === "learned" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleStageChange("learned")}
+            >
+              Learned
+            </Button>
           </ButtonGroup>
         </div>
       </div>

@@ -50,6 +50,7 @@ def get_history():
     Query params:
         - page: Page number (default: 1)
         - language_code: Filter by phrase language (optional, e.g., 'de', 'en')
+        - stage: Filter by learning stage (optional: 'all', 'in_progress', 'learned')
 
     Returns:
         JSON object with searches array containing:
@@ -70,19 +71,37 @@ def get_history():
         # Get query params
         page = request.args.get('page', 1, type=int)
         language_code = request.args.get('language_code', None, type=str)
+        stage = request.args.get('stage', 'all', type=str)
         per_page = 100
 
         # Ensure page is at least 1
         page = max(page, 1)
 
-        # Build query with optional language filter
+        # Build query with LEFT JOIN to user_learning_progress
         query = (UserSearch.query
                  .filter_by(user_id=current_user.id)
-                 .join(Phrase))
+                 .join(Phrase)
+                 .outerjoin(UserLearningProgress,
+                           db.and_(UserLearningProgress.user_id == current_user.id,
+                                  UserLearningProgress.phrase_id == Phrase.id)))
 
         # Add language filter if provided
         if language_code:
             query = query.filter(Phrase.language_code == language_code)
+
+        # Add stage filter if provided
+        if stage == 'in_progress':
+            # In progress: no learning progress entry OR stage != 'mastered'
+            query = query.filter(
+                db.or_(
+                    UserLearningProgress.id.is_(None),
+                    UserLearningProgress.stage != 'mastered'
+                )
+            )
+        elif stage == 'learned':
+            # Learned: stage = 'mastered'
+            query = query.filter(UserLearningProgress.stage == 'mastered')
+        # 'all' means no additional filter
 
         # Apply ordering and pagination
         pagination = (query
