@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from models.language import Language
 from models.user_searches import UserSearch
@@ -47,12 +47,17 @@ def get_history():
     """
     Get user's search history with phrases and translations.
 
+    Query params:
+        - page: Page number (default: 1)
+
     Returns:
         JSON object with searches array containing:
         - id: search ID
         - phrase: {id, text, language_code, phrase_type}
         - translations: {language_code: translation_text}
         - searched_at: ISO timestamp
+        And pagination metadata:
+        - pagination: {page, per_page, total, pages}
     """
     try:
         if not current_user.is_authenticated:
@@ -61,17 +66,23 @@ def get_history():
                 'error': 'User not authenticated'
             }), 401
 
+        # Get page param from query string (fixed at 100 per page)
+        page = request.args.get('page', 1, type=int)
+        per_page = 100
+
+        # Ensure page is at least 1
+        page = max(page, 1)
+
         # Query user searches with phrase join, ordered by most recent first
-        searches = (UserSearch.query
-                    .filter_by(user_id=current_user.id)
-                    .join(Phrase)
-                    .order_by(UserSearch.searched_at.desc())
-                    .limit(200)
-                    .all())
+        pagination = (UserSearch.query
+                      .filter_by(user_id=current_user.id)
+                      .join(Phrase)
+                      .order_by(UserSearch.searched_at.desc())
+                      .paginate(page=page, per_page=per_page, error_out=False))
 
         # Format response
         searches_data = []
-        for search in searches:
+        for search in pagination.items:
             # Get translations from llm_translations_json
             # llm_translations_json has language NAMES as keys: {"English": [["cat", "noun", "..."]], "German": [...]}
             # We need to convert to language CODES: {"en": "cat", "de": "Katze"}
@@ -112,7 +123,12 @@ def get_history():
         return jsonify({
             'success': True,
             'searches': searches_data,
-            'total': len(searches_data)
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
         }), 200
 
     except Exception as e:

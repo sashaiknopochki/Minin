@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -9,6 +10,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Trash2, Loader2 } from "lucide-react";
 
 interface Phrase {
@@ -27,17 +37,29 @@ interface SearchHistoryItem {
   searched_at: string;
 }
 
+interface PaginationInfo {
+  page: number;
+  per_page: number;
+  total: number;
+  pages: number;
+}
+
 interface HistoryResponse {
   searches: SearchHistoryItem[];
-  total: number;
+  pagination: PaginationInfo;
 }
 
 export default function History() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [historyData, setHistoryData] = useState<SearchHistoryItem[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
+
+  // Get current page from URL or default to 1
+  const currentPage = parseInt(searchParams.get("page") || "1", 10);
 
   // Get user's active languages for column headers
   const userLanguages = user?.translator_languages || [];
@@ -53,7 +75,7 @@ export default function History() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch("/api/history", {
+        const response = await fetch(`/api/history?page=${currentPage}`, {
           method: "GET",
           credentials: "include",
         });
@@ -64,6 +86,7 @@ export default function History() {
 
         const data: HistoryResponse = await response.json();
         setHistoryData(data.searches || []);
+        setPagination(data.pagination);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load history");
       } finally {
@@ -76,7 +99,12 @@ export default function History() {
     } else {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, currentPage]);
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setSearchParams({ page: newPage.toString() });
+  };
 
   // Handle delete
   const handleDelete = async (searchId: number) => {
@@ -286,10 +314,111 @@ export default function History() {
         </Table>
       </div>
 
-      {/* Total count */}
-      <div className="mt-4 text-sm text-muted-foreground">
-        Showing {historyData.length} search{historyData.length !== 1 ? "es" : ""}
-      </div>
+      {/* Pagination and Result Count */}
+      {pagination && (
+        <div className="mt-6 space-y-4">
+          {/* Result count display */}
+          <div className="text-sm text-muted-foreground text-center">
+            Showing {((pagination.page - 1) * pagination.per_page) + 1}-
+            {Math.min(pagination.page * pagination.per_page, pagination.total)} of {pagination.total} results
+          </div>
+
+          {/* Pagination controls */}
+          {pagination.pages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                {/* Previous button */}
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+
+                {/* Page numbers */}
+                {(() => {
+                  const pages = [];
+                  const totalPages = pagination.pages;
+
+                  // Always show first page
+                  pages.push(
+                    <PaginationItem key={1}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(1)}
+                        isActive={currentPage === 1}
+                        className="cursor-pointer"
+                      >
+                        1
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+
+                  // Show ellipsis if needed before current page range
+                  if (currentPage > 3) {
+                    pages.push(
+                      <PaginationItem key="ellipsis-start">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  // Show pages around current page
+                  const startPage = Math.max(2, currentPage - 1);
+                  const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <PaginationItem key={i}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(i)}
+                          isActive={currentPage === i}
+                          className="cursor-pointer"
+                        >
+                          {i}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+
+                  // Show ellipsis if needed after current page range
+                  if (currentPage < totalPages - 2) {
+                    pages.push(
+                      <PaginationItem key="ellipsis-end">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  // Always show last page (if more than 1 page)
+                  if (totalPages > 1) {
+                    pages.push(
+                      <PaginationItem key={totalPages}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(totalPages)}
+                          isActive={currentPage === totalPages}
+                          className="cursor-pointer"
+                        >
+                          {totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  }
+
+                  return pages;
+                })()}
+
+                {/* Next button */}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    className={currentPage >= pagination.pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
+      )}
     </div>
   );
 }
