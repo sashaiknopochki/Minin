@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 from models.language import Language
 from models.user_searches import UserSearch
 from models.phrase import Phrase
+from models.user_learning_progress import UserLearningProgress
 from models import db
 from services.language_utils import get_language_code
 
@@ -153,13 +154,28 @@ def delete_history_item(search_id):
                 'error': 'Search not found or does not belong to user'
             }), 404
 
-        # Delete the search
+        # Store phrase_id before deleting the search
+        phrase_id = search.phrase_id
+
+        # Delete the search from user_searches
         db.session.delete(search)
+
+        # Also delete the learning progress for this user + phrase
+        # (if it exists - it may not exist if user never took a quiz on this phrase)
+        learning_progress = UserLearningProgress.query.filter_by(
+            user_id=current_user.id,
+            phrase_id=phrase_id
+        ).first()
+
+        if learning_progress:
+            db.session.delete(learning_progress)
+
+        # Commit both deletions
         db.session.commit()
 
         return jsonify({
             'success': True,
-            'message': 'Search deleted successfully'
+            'message': 'Search and learning progress deleted successfully'
         }), 200
 
     except Exception as e:
