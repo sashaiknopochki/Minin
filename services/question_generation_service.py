@@ -119,7 +119,13 @@ class QuestionGenerationService:
 
         # Update quiz attempt
         quiz_attempt.prompt_json = question_data['prompt']
-        quiz_attempt.correct_answer = question_data['correct_answer']
+
+        # Handle correct_answer: convert list to JSON string if needed
+        correct_answer = question_data['correct_answer']
+        if isinstance(correct_answer, list):
+            quiz_attempt.correct_answer = json.dumps(correct_answer)
+        else:
+            quiz_attempt.correct_answer = correct_answer
 
         db.session.commit()
 
