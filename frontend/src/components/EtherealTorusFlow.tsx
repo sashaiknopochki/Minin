@@ -1,14 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 // themes: source follows itself, ever-flowing nature, return to source
 // visualization: Particles flow in an eternal cycle, always returning to their origin
 
 const EtherealTorusFlow = () => {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     // Set canvas size according to project requirements
     canvas.width = 1500;
