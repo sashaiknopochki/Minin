@@ -1,10 +1,11 @@
 """Learning Progress Service - Manages user learning progress tracking for spaced repetition"""
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from models import db
 from models.user_learning_progress import UserLearningProgress
 from models.user_searches import UserSearch
+from models.quiz_attempt import QuizAttempt
 
 logger = logging.getLogger(__name__)
 
@@ -218,3 +219,207 @@ def get_learning_progress(user_id: int, phrase_id: int) -> Optional[UserLearning
         user_id=user_id,
         phrase_id=phrase_id
     ).first()
+
+
+# Quiz-related functions
+
+def update_after_quiz(quiz_attempt_id: int) -> dict:
+    """
+    Update learning progress after quiz attempt.
+
+    This is the main function called after a user answers a quiz question.
+    It updates:
+    - times_reviewed (increment by 1)
+    - times_correct / times_incorrect (based on answer correctness)
+    - stage (if advancement criteria met)
+    - next_review_date (spaced repetition)
+    - last_reviewed_at (current timestamp)
+
+    When advancing stages, times_correct and times_incorrect are reset to 0.
+
+    Args:
+        quiz_attempt_id: The ID of the quiz attempt
+
+    Returns:
+        dict: {
+            'old_stage': str,
+            'new_stage': str,
+            'stage_advanced': bool,
+            'next_review_date': date or None
+        }
+
+    Raises:
+        ValueError: If quiz attempt or progress not found
+
+    Example:
+        >>> result = update_after_quiz(quiz_attempt_id=123)
+        >>> result['stage_advanced']
+        True
+        >>> result['new_stage']
+        'intermediate'
+    """
+    quiz_attempt = QuizAttempt.query.get(quiz_attempt_id)
+    if not quiz_attempt:
+        raise ValueError(f"Quiz attempt {quiz_attempt_id} not found")
+
+    progress = UserLearningProgress.query.filter_by(
+        user_id=quiz_attempt.user_id,
+        phrase_id=quiz_attempt.phrase_id
+    ).first()
+
+    if not progress:
+        raise ValueError(f"No progress found for quiz attempt {quiz_attempt_id}")
+
+    # Update metrics
+    progress.times_reviewed += 1
+    if quiz_attempt.was_correct:
+        progress.times_correct += 1
+    else:
+        progress.times_incorrect += 1
+
+    progress.last_reviewed_at = datetime.utcnow()
+
+    # Check for stage advancement
+    old_stage = progress.stage
+    if _should_advance_stage(progress):
+        progress.stage = _get_next_stage(progress.stage)
+
+        # Reset counters when advancing to new stage
+        progress.times_correct = 0
+        progress.times_incorrect = 0
+
+    # Calculate next review date
+    progress.next_review_date = _calculate_next_review(
+        progress=progress,
+        was_correct=quiz_attempt.was_correct
+    )
+
+    db.session.commit()
+
+    logger.info(
+        f"Updated learning progress after quiz: user_id={quiz_attempt.user_id}, "
+        f"phrase_id={quiz_attempt.phrase_id}, old_stage={old_stage}, "
+        f"new_stage={progress.stage}, was_correct={quiz_attempt.was_correct}"
+    )
+
+    return {
+        'old_stage': old_stage,
+        'new_stage': progress.stage,
+        'stage_advanced': old_stage != progress.stage,
+        'next_review_date': progress.next_review_date
+    }
+
+
+def _should_advance_stage(progress: UserLearningProgress) -> bool:
+    """
+    Check if user should advance to next stage based on performance.
+
+    Advancement criteria:
+    - basic: 2 correct answers → advance to intermediate
+    - intermediate: 2 correct answers → advance to advanced
+    - advanced: 3 correct answers → advance to mastered
+    - mastered: never advance (final state)
+
+    Args:
+        progress: UserLearningProgress object
+
+    Returns:
+        bool: True if should advance, False otherwise
+
+    Example:
+        >>> progress.stage = 'basic'
+        >>> progress.times_correct = 2
+        >>> _should_advance_stage(progress)
+        True
+    """
+    if progress.stage == STAGE_BASIC:
+        return progress.times_correct >= 2
+    elif progress.stage == STAGE_INTERMEDIATE:
+        return progress.times_correct >= 2
+    elif progress.stage == STAGE_ADVANCED:
+        return progress.times_correct >= 3
+    elif progress.stage == STAGE_MASTERED:
+        return False
+    return False
+
+
+def _get_next_stage(current_stage: str) -> str:
+    """
+    Get next stage in progression.
+
+    Stage progression:
+    basic → intermediate → advanced → mastered
+
+    Args:
+        current_stage: Current learning stage
+
+    Returns:
+        str: Next stage
+
+    Example:
+        >>> _get_next_stage('basic')
+        'intermediate'
+    """
+    stages = {
+        STAGE_BASIC: STAGE_INTERMEDIATE,
+        STAGE_INTERMEDIATE: STAGE_ADVANCED,
+        STAGE_ADVANCED: STAGE_MASTERED,
+        STAGE_MASTERED: STAGE_MASTERED
+    }
+    return stages.get(current_stage, STAGE_BASIC)
+
+
+def _calculate_next_review(progress: UserLearningProgress, was_correct: bool) -> Optional[date]:
+    """
+    Calculate next review date using spaced repetition.
+
+    Intervals based on stage and correctness:
+
+    BASIC:
+    - Correct: 1 day
+    - Incorrect: 0 days (same day)
+
+    INTERMEDIATE:
+    - Correct: 3 days
+    - Incorrect: 1 day
+
+    ADVANCED:
+    - Correct: 7 days (if times_correct < 2), 14 days (if times_correct >= 2)
+    - Incorrect: 3 days
+
+    MASTERED:
+    - None (never review)
+
+    Args:
+        progress: UserLearningProgress object
+        was_correct: Whether the user answered correctly
+
+    Returns:
+        date: Next review date, or None for mastered phrases
+
+    Example:
+        >>> progress.stage = 'basic'
+        >>> _calculate_next_review(progress, was_correct=True)
+        datetime.date(2025, 12, 3)  # Tomorrow
+    """
+    if progress.stage == STAGE_MASTERED:
+        return None  # Never review mastered words
+
+    if was_correct:
+        # Correct answer - increase interval
+        intervals = {
+            STAGE_BASIC: 1,
+            STAGE_INTERMEDIATE: 3,
+            STAGE_ADVANCED: 7 if progress.times_correct < 2 else 14
+        }
+        days = intervals.get(progress.stage, 1)
+    else:
+        # Incorrect answer - review soon
+        intervals = {
+            STAGE_BASIC: 0,  # Same day
+            STAGE_INTERMEDIATE: 1,
+            STAGE_ADVANCED: 3
+        }
+        days = intervals.get(progress.stage, 1)
+
+    return date.today() + timedelta(days=days)
