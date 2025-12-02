@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+{
+  "aliases": {
+    "ui": "src/components/ui",
+    "components": "src/components"
+  }
+}

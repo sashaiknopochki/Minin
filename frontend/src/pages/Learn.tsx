@@ -4,6 +4,7 @@ import { QuizDialog } from '@/components/QuizDialog'
 
 export default function Learn() {
   const [showQuiz, setShowQuiz] = useState(false)
+  const [quizResult, setQuizResult] = useState(null)
 
   const testQuiz = {
     quiz_attempt_id: 1,
@@ -11,6 +12,25 @@ export default function Learn() {
     options: ["cat", "dog", "house", "tree"],
     question_type: "multiple_choice_target",
     phrase_id: 123,
+  }
+
+  const handleAnswerSubmit = (answer: string) => {
+    const isCorrect = answer === "cat"
+
+    const result = {
+      was_correct: isCorrect,
+      correct_answer: "cat",
+      user_answer: answer,
+    }
+
+    setQuizResult(result)
+    console.log("Result:", result)
+  }
+
+  const handleContinue = () => {
+    // Reset result to show a new quiz
+    setQuizResult(null)
+    // In real app, this would fetch a new quiz question from backend
   }
 
   return (
@@ -30,15 +50,10 @@ export default function Learn() {
         open={showQuiz}
         onOpenChange={setShowQuiz}
         quizData={testQuiz}
-        onSubmit={(answer) => {
-          console.log("Selected:", answer)
-          alert(`You chose: ${answer}`)
-          setShowQuiz(false)
-        }}
-        onSkip={() => {
-          alert("Quiz skipped")
-          setShowQuiz(false)
-        }}
+        onSubmit={handleAnswerSubmit}
+        onSkip={() => setShowQuiz(false)}
+        onContinue={handleContinue}
+        result={quizResult}
       />
     </div>
   );
