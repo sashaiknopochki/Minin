@@ -359,5 +359,105 @@ class TestTranslationWithLearningProgressIntegration:
             assert progress_count == 0
 
 
+    @patch('routes.translation.get_or_create_translations')
+    @patch('flask_login.utils._get_user')
+    def test_quiz_trigger_on_search_threshold(
+        self,
+        mock_get_user,
+        mock_translate,
+        client,
+        authenticated_user
+    ):
+        """
+        Integration test: Quiz should trigger after search threshold is reached
+
+        Flow:
+        1. User has quiz_frequency=5 (default)
+        2. User searches 5 times
+        3. On the 5th search, response should include quiz trigger fields
+        4. searches_since_last_quiz counter increments correctly
+        """
+        # Setup mock user authentication
+        with client.application.app_context():
+            user = User.query.get(authenticated_user)
+            user.quiz_mode_enabled = True
+            user.quiz_frequency = 5
+            user.searches_since_last_quiz = 0
+            db.session.commit()
+
+            mock_get_user.return_value = user
+
+            # Create a phrase with due learning progress
+            from datetime import date, timedelta
+            phrase = Phrase(
+                text='test',
+                language_code='de',
+                is_quizzable=True
+            )
+            db.session.add(phrase)
+            db.session.flush()
+
+            progress = UserLearningProgress(
+                user_id=user.id,
+                phrase_id=phrase.id,
+                stage='basic',
+                next_review_date=date.today() - timedelta(days=1)  # Overdue
+            )
+            db.session.add(progress)
+            db.session.commit()
+
+            # Mock successful translation response
+            mock_translate.return_value = {
+                'success': True,
+                'original_text': 'katze',
+                'source_language': 'German',
+                'target_languages': ['English'],
+                'native_language': 'English',
+                'translations': {
+                    'English': [['cat', 'noun', 'domestic animal']]
+                },
+                'source_info': ['katze', 'noun', 'feminine noun'],
+                'model': 'gpt-4.1-mini',
+                'usage': {'prompt_tokens': 100, 'completion_tokens': 50, 'total_tokens': 150}
+            }
+
+            # Perform 4 searches (below threshold)
+            for i in range(4):
+                response = client.post('/translation/translate', json={
+                    'text': f'word{i}',
+                    'source_language': 'German',
+                    'target_languages': ['English']
+                })
+                assert response.status_code == 200
+                data = response.get_json()
+                assert data['should_show_quiz'] is False
+                assert data['searches_until_next_quiz'] > 0
+
+            # Refresh user to get updated counter
+            db.session.refresh(user)
+            assert user.searches_since_last_quiz == 4
+
+            # 5th search should trigger quiz
+            response = client.post('/translation/translate', json={
+                'text': 'hund',
+                'source_language': 'German',
+                'target_languages': ['English']
+            })
+            assert response.status_code == 200
+            data = response.get_json()
+
+            # Verify quiz trigger fields
+            assert 'should_show_quiz' in data
+            assert 'searches_until_next_quiz' in data
+            assert data['should_show_quiz'] is True
+            assert data['searches_until_next_quiz'] == 0
+            assert 'quiz_phrase_id' in data
+            assert data['quiz_phrase_id'] == phrase.id
+
+            # Verify counter incremented
+            db.session.refresh(user)
+            assert user.searches_since_last_quiz == 5
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

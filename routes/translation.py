@@ -6,6 +6,8 @@ from services.session_service import get_or_create_session
 from services.language_utils import get_language_code
 from services.phrase_translation_service import get_or_create_translations
 from services.learning_progress_service import initialize_learning_progress_on_search
+from services.quiz_trigger_service import QuizTriggerService
+from models import db
 
 bp = Blueprint('translation', __name__, url_prefix='/translation')
 
@@ -45,7 +47,10 @@ def translate():
             "prompt_tokens": 150,
             "completion_tokens": 50,
             "total_tokens": 200
-        }
+        },
+        "should_show_quiz": true,  // Only for authenticated users
+        "searches_until_next_quiz": 0,  // Only for authenticated users
+        "quiz_phrase_id": 456  // Only when should_show_quiz is true
     }
     """
     try:
@@ -151,6 +156,21 @@ def translate():
                     except Exception as progress_error:
                         # Log error but don't fail the request
                         print(f"Failed to initialize learning progress: {str(progress_error)}")
+
+                # Increment search counter for quiz triggering
+                current_user.searches_since_last_quiz += 1
+                db.session.commit()
+
+                # Check if quiz should be triggered
+                quiz_check = QuizTriggerService.should_trigger_quiz(current_user)
+
+                # Add quiz-related fields to response
+                result['should_show_quiz'] = quiz_check['should_trigger']
+                result['searches_until_next_quiz'] = current_user.quiz_frequency - current_user.searches_since_last_quiz
+
+                # If quiz should trigger, include the phrase_id to quiz
+                if quiz_check['should_trigger'] and quiz_check.get('eligible_phrase'):
+                    result['quiz_phrase_id'] = quiz_check['eligible_phrase'].phrase_id
 
             except Exception as e:
                 # Log error but don't fail the request
