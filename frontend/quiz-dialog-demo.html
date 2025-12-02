@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizDialog Component - Demo Instructions</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 { color: #333; }
+        .section { margin: 30px 0; padding: 20px; background: #f5f5f5; border-radius: 8px; }
+        code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+        .step { margin: 15px 0; }
+        .important { background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>📝 QuizDialog Component - Testing Guide</h1>
+
+    <div class="important">
+        <strong>✅ Your app should be working again!</strong> I've reverted the changes that caused the white screen.
+    </div>
+
+    <div class="section">
+        <h2>✨ What Was Created</h2>
+        <p>The QuizDialog component has been successfully created with:</p>
+        <ul>
+            <li><code>frontend/src/components/QuizDialog.tsx</code> - Main component</li>
+            <li><code>frontend/src/components/ui/radio-group.tsx</code> - Radio button UI</li>
+            <li><code>frontend/src/components/ui/label.tsx</code> - Label UI</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📱 Responsive Design Features</h2>
+        <p>The component is fully responsive:</p>
+        <ul>
+            <li><strong>Mobile (&lt;640px):</strong> Full-width dialog, stacked buttons</li>
+            <li><strong>Tablet (640px-1024px):</strong> Centered 500px dialog, horizontal buttons</li>
+            <li><strong>Desktop (1024px+):</strong> Centered 500px dialog, horizontal buttons</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🧪 How to Test the Component</h2>
+
+        <div class="step">
+            <h3>Method 1: Add to an Existing Page (Recommended)</h3>
+            <p>Add the QuizDialog to one of your existing pages (e.g., Translate or Learn):</p>
+            <pre><code>// In pages/Translate.tsx or pages/Learn.tsx
+import { QuizDialog } from '@/components/QuizDialog'
+import { useState } from 'react'
+
+// Inside your component:
+const [showQuiz, setShowQuiz] = useState(false)
+
+const sampleQuiz = {
+  quiz_attempt_id: 1,
+  question: "What is the English translation of 'Katze'?",
+  options: ["cat", "dog", "house", "tree"],
+  question_type: "multiple_choice_target",
+  phrase_id: 123,
+}
+
+// Add a test button somewhere in your JSX:
+&lt;Button onClick={() => setShowQuiz(true)}&gt;Test Quiz&lt;/Button&gt;
+
+// Add the dialog at the end of your component:
+&lt;QuizDialog
+  open={showQuiz}
+  onOpenChange={setShowQuiz}
+  quizData={sampleQuiz}
+  onSubmit={(answer) => {
+    console.log("Answer:", answer)
+    setShowQuiz(false)
+  }}
+  onSkip={() => setShowQuiz(false)}
+/&gt;</code></pre>
+        </div>
+
+        <div class="step">
+            <h3>Method 2: Test in Browser DevTools</h3>
+            <p>You can directly test the responsive design without adding code:</p>
+            <ol>
+                <li>Once you add it to a page (Method 1), click the test button</li>
+                <li>Press <strong>F12</strong> to open DevTools</li>
+                <li>Click the device icon or press <strong>Cmd+Shift+M</strong> (Mac) / <strong>Ctrl+Shift+M</strong> (Windows)</li>
+                <li>Select devices: iPhone SE, iPad, or Responsive</li>
+                <li>Verify layout adapts correctly</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🔌 Integration with Backend</h2>
+        <p>When you're ready to connect to your quiz system:</p>
+        <pre><code>// The component expects this data structure from your API:
+interface QuizData {
+  quiz_attempt_id: number
+  question: string
+  options: string[]
+  question_type: string
+  phrase_id: number
+}
+
+// Example API call:
+const response = await fetch('/api/quiz/next')
+const quizData = await response.json()
+
+// Pass to component:
+&lt;QuizDialog quizData={quizData} ... /&gt;</code></pre>
+    </div>
+
+    <div class="important">
+        <strong>📝 Note:</strong> The standalone test page (QuizDialogTest.tsx) caused import issues. It's better to test by adding the component directly to an existing page as shown in Method 1 above.
+    </div>
+
+    <div class="section">
+        <h2>✅ Component Features</h2>
+        <ul>
+            <li>✓ Clean, minimalistic design with Neutral palette</li>
+            <li>✓ Uses Inter font (consistent with your app)</li>
+            <li>✓ Fully responsive (mobile, tablet, desktop)</li>
+            <li>✓ Proper TypeScript types</li>
+            <li>✓ Submit button disabled until selection</li>
+            <li>✓ Smooth transitions and hover states</li>
+            <li>✓ Accessible with proper labels</li>
+        </ul>
+    </div>
+</body>
+</html>
