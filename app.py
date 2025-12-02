@@ -18,7 +18,10 @@ def create_app(config_name=None):
     CORS(app, resources={
         r"/api/*": {"origins": ["http://localhost:5173"]},
         r"/auth/*": {"origins": ["http://localhost:5173"]},
-        r"/translation/*": {"origins": ["http://localhost:5173"]}
+        r"/translation/*": {"origins": ["http://localhost:5173"]},
+        r"/quiz/*": {"origins": ["http://localhost:5173"]},
+        r"/progress/*": {"origins": ["http://localhost:5173"]},
+        r"/settings/*": {"origins": ["http://localhost:5173"]}
     }, supports_credentials=True)
 
     # Initialize SQLAlchemy
