@@ -30,7 +30,7 @@ class TestGoogleOAuth(unittest.TestCase):
     def setUp(self):
         """Set up test client and database"""
         # Create app with test configuration
-        self.app = create_app('development')
+        self.app = create_app('testing')
         self.app.config['TESTING'] = True
         self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test_auth.db'
         self.app.config['WTF_CSRF_ENABLED'] = False

@@ -30,10 +30,15 @@ from services.answer_evaluation_service import AnswerEvaluationService
 
 @pytest.fixture(scope='function')
 def app_context():
-    """Create a fresh app context and database for each test"""
-    app = create_app('development')
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'  # In-memory database
-    app.config['TESTING'] = True
+    """
+    Create a fresh app context with IN-MEMORY database for each test.
+
+    CRITICAL: Uses create_app('testing') to ensure we NEVER touch the real database.
+    The 'testing' config starts with sqlite:///:memory: from the beginning.
+    """
+    # ✅ CORRECT: Use 'testing' config which starts with :memory:
+    # ❌ WRONG: create_app('development') connects to real DB before we can override
+    app = create_app('testing')
 
     with app.app_context():
         db.create_all()

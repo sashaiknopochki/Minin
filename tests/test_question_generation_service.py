@@ -38,7 +38,7 @@ from uuid import uuid4
 @pytest.fixture(scope='function')
 def app_context():
     """Create a fresh app context and database for each test"""
-    app = create_app('development')
+    app = create_app('testing')
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'  # In-memory database
     app.config['TESTING'] = True
 

@@ -18,7 +18,7 @@ from uuid import uuid4
 from datetime import datetime
 
 # Create app with test configuration
-app = create_app('development')
+app = create_app('testing')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test_database.db'
 
 def cleanup():
