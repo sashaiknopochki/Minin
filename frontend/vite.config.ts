@@ -25,6 +25,10 @@ export default defineConfig({
         target: 'http://localhost:5001',
         changeOrigin: true,
       },
+      '/quiz': {
+        target: 'http://localhost:5001',
+        changeOrigin: true,
+      },
     },
   },
 })

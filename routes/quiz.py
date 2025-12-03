@@ -89,8 +89,9 @@ def get_next_quiz():
         # Generate question
         question_data = QuestionGenerationService.generate_question(quiz_attempt)
 
-        # Reset search counter
-        current_user.searches_since_last_quiz = 0
+        # Note: searches_since_last_quiz is NOT reset here
+        # It will be reset only when user submits an answer (see /answer endpoint)
+        # This ensures skipped quizzes will trigger again on next translation
         db.session.commit()
 
         return jsonify({
@@ -169,6 +170,10 @@ def submit_quiz_answer():
 
         # Update learning progress
         progress_update = update_after_quiz(quiz_attempt_id)
+
+        # Reset search counter only after user answers (not on skip)
+        current_user.searches_since_last_quiz = 0
+        db.session.commit()
 
         return jsonify({
             'was_correct': evaluation['was_correct'],

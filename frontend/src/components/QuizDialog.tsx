@@ -102,7 +102,7 @@ export function QuizDialog({
           </p>
         </div>
       )
-    }
+}
 
     if (result.was_correct) {
       return (

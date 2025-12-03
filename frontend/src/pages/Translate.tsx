@@ -143,10 +143,19 @@ export default function Translate() {
 
       const data = await response.json();
 
+      // Debug: Log quiz trigger information
+      console.log('Translation response:', {
+        should_show_quiz: data.should_show_quiz,
+        quiz_phrase_id: data.quiz_phrase_id,
+        searches_until_next_quiz: data.searches_until_next_quiz
+      });
+
       if (data.success) {
         return {
           translations: data.translations,
-          source_info: data.source_info
+          source_info: data.source_info,
+          shouldShowQuiz: data.should_show_quiz,
+          quizPhraseId: data.quiz_phrase_id
         };
       } else {
         setTranslationError(data.error || "Translation failed");
@@ -207,7 +216,7 @@ export default function Translate() {
       const result = await translateText(value, sourceLang, targetLangs);
 
       if (result) {
-        const { translations, source_info } = result;
+        const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
 
         const targetLangNames = targetLangs.map(getLanguageName);
         const translatedTexts = targetLangNames.map((langName) => {
@@ -241,6 +250,22 @@ export default function Translate() {
           setTranslations1(structuredTranslations[0]);
           setTranslations2(structuredTranslations[1]);
           setTranslations3(sourceInfoArray);
+        }
+
+        // Trigger quiz after delay if needed (only for logged-in users)
+        console.log('Quiz trigger check:', {
+          user: !!user,
+          shouldShowQuiz,
+          quizPhraseId,
+          willTrigger: !!(user && shouldShowQuiz && quizPhraseId)
+        });
+
+        if (user && shouldShowQuiz && quizPhraseId) {
+          console.log('Setting quiz timeout...');
+          setTimeout(() => {
+            console.log('Fetching quiz now for phrase:', quizPhraseId);
+            fetchAndShowQuiz(quizPhraseId);
+          }, 2500); // 2.5 second delay
         }
       }
     }, 1000);
@@ -276,27 +301,101 @@ export default function Translate() {
     }
   };
 
-  // Quiz handlers
-  const handleQuizSubmit = (answer: string) => {
-    if (!quizData) return;
+  // Fetch and show quiz from backend
+  const fetchAndShowQuiz = async (phraseId: number) => {
+    try {
+      console.log('Fetching quiz from:', `/quiz/next?phrase_id=${phraseId}`);
+      const response = await fetch(`/quiz/next?phrase_id=${phraseId}`);
 
-    // For now, using mock logic (backend API will provide the correct answer)
-    const isCorrect = answer === "cat"; // This will come from backend
+      console.log('Quiz response status:', response.status);
+      console.log('Quiz response headers:', response.headers.get('content-type'));
 
-    const result: QuizResult = {
-      was_correct: isCorrect,
-      correct_answer: "cat", // This will come from backend
-      user_answer: answer,
-    };
+      // Log raw response text first to see what we're getting
+      const responseText = await response.text();
+      console.log('Quiz response body (first 200 chars):', responseText.substring(0, 200));
 
-    setQuizResult(result);
-    console.log("Quiz result:", result);
+      // Try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError);
+        console.error('Response was:', responseText.substring(0, 500));
+        return;
+      }
+
+      if (response.ok) {
+        const quizData: QuizData = {
+          quiz_attempt_id: data.quiz_attempt_id,
+          question: data.question,
+          options: data.options,
+          question_type: data.question_type,
+          phrase_id: data.phrase_id
+        };
+
+        setQuizData(quizData);
+        setShowQuiz(true);
+        setQuizResult(null);
+      } else {
+        // Silently skip if no quiz available (404 error)
+        console.log('No quiz available:', data.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch quiz:', error);
+    }
   };
 
-  const handleQuizSkip = () => {
-    setShowQuiz(false);
-    setQuizData(null);
-    setQuizResult(null);
+  // Quiz handlers
+  const handleQuizSubmit = async (answer: string) => {
+    if (!quizData) return;
+
+    try {
+      const response = await fetch('/quiz/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quiz_attempt_id: quizData.quiz_attempt_id,
+          user_answer: answer
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const result: QuizResult = {
+          was_correct: data.was_correct,
+          correct_answer: data.correct_answer,
+          user_answer: answer
+        };
+
+        setQuizResult(result);
+      } else {
+        console.error('Failed to submit quiz answer:', data.error);
+      }
+    } catch (error) {
+      console.error('Failed to submit quiz answer:', error);
+    }
+  };
+
+  const handleQuizSkip = async () => {
+    if (!quizData) return;
+
+    try {
+      await fetch('/quiz/skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phrase_id: quizData.phrase_id
+        })
+      });
+    } catch (error) {
+      console.error('Failed to skip quiz:', error);
+    } finally {
+      // Always close the dialog
+      setShowQuiz(false);
+      setQuizData(null);
+      setQuizResult(null);
+    }
   };
 
   const handleQuizContinue = () => {
@@ -577,29 +676,6 @@ export default function Translate() {
             <p className="text-sm text-destructive">
               Translation error: {translationError}
             </p>
-          </div>
-        )}
-
-        {/* Test Quiz Button - For testing only */}
-        {user && (
-          <div className="mt-6 flex justify-center">
-            <Button
-              onClick={() => {
-                const testQuiz: QuizData = {
-                  quiz_attempt_id: 1,
-                  question: "What is the English translation of 'Katze'?",
-                  options: ["cat", "dog", "house", "tree"],
-                  question_type: "multiple_choice_target",
-                  phrase_id: 123,
-                };
-                setQuizData(testQuiz);
-                setShowQuiz(true);
-                setQuizResult(null);
-              }}
-              variant="outline"
-            >
-              Test Quiz Dialog
-            </Button>
           </div>
         )}
       </main>

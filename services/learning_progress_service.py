@@ -101,6 +101,7 @@ def create_initial_progress(user_id: int, phrase_id: int) -> Optional[UserLearni
             return None
 
         # Create new learning progress entry
+        # Set next_review_date to today so phrase is immediately eligible for quiz
         progress = UserLearningProgress(
             user_id=user_id,
             phrase_id=phrase_id,
@@ -108,7 +109,7 @@ def create_initial_progress(user_id: int, phrase_id: int) -> Optional[UserLearni
             times_reviewed=0,
             times_correct=0,
             times_incorrect=0,
-            next_review_date=None,  # NULL until first quiz attempt
+            next_review_date=date.today(),  # Eligible for quiz immediately
             first_seen_at=datetime.utcnow(),
             created_at=datetime.utcnow()
         )
