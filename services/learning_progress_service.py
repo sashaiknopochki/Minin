@@ -250,7 +250,9 @@ def update_after_quiz(quiz_attempt_id: int) -> dict:
         }
 
     Raises:
-        ValueError: If quiz attempt or progress not found
+        ValueError: If quiz_attempt_id is invalid, quiz attempt not found,
+                   progress not found, or invalid stage transitions
+        RuntimeError: If database operations fail
 
     Example:
         >>> result = update_after_quiz(quiz_attempt_id=123)
@@ -259,56 +261,129 @@ def update_after_quiz(quiz_attempt_id: int) -> dict:
         >>> result['new_stage']
         'intermediate'
     """
-    quiz_attempt = QuizAttempt.query.get(quiz_attempt_id)
+    # Validate quiz_attempt_id
+    if not isinstance(quiz_attempt_id, int) or quiz_attempt_id <= 0:
+        logger.error(f"Invalid quiz_attempt_id: {quiz_attempt_id}")
+        raise ValueError(f"quiz_attempt_id must be a positive integer, got: {quiz_attempt_id}")
+
+    # Retrieve quiz attempt with error handling
+    try:
+        quiz_attempt = QuizAttempt.query.get(quiz_attempt_id)
+    except Exception as e:
+        logger.error(f"Database error retrieving quiz attempt {quiz_attempt_id}: {str(e)}", exc_info=True)
+        raise RuntimeError(f"Failed to retrieve quiz attempt: {str(e)}")
+
     if not quiz_attempt:
+        logger.error(f"Quiz attempt not found: {quiz_attempt_id}")
         raise ValueError(f"Quiz attempt {quiz_attempt_id} not found")
 
-    progress = UserLearningProgress.query.filter_by(
-        user_id=quiz_attempt.user_id,
-        phrase_id=quiz_attempt.phrase_id
-    ).first()
+    # Validate quiz attempt has required fields
+    if not hasattr(quiz_attempt, 'user_id') or not quiz_attempt.user_id:
+        logger.error(f"Quiz attempt {quiz_attempt_id} missing user_id")
+        raise ValueError(f"Quiz attempt {quiz_attempt_id} missing user_id")
+
+    if not hasattr(quiz_attempt, 'phrase_id') or not quiz_attempt.phrase_id:
+        logger.error(f"Quiz attempt {quiz_attempt_id} missing phrase_id")
+        raise ValueError(f"Quiz attempt {quiz_attempt_id} missing phrase_id")
+
+    if not hasattr(quiz_attempt, 'was_correct') or quiz_attempt.was_correct is None:
+        logger.error(f"Quiz attempt {quiz_attempt_id} missing was_correct field")
+        raise ValueError(f"Quiz attempt {quiz_attempt_id} missing was_correct field")
+
+    # Retrieve learning progress with error handling
+    try:
+        progress = UserLearningProgress.query.filter_by(
+            user_id=quiz_attempt.user_id,
+            phrase_id=quiz_attempt.phrase_id
+        ).first()
+    except Exception as e:
+        logger.error(
+            f"Database error retrieving progress for user_id={quiz_attempt.user_id}, "
+            f"phrase_id={quiz_attempt.phrase_id}: {str(e)}",
+            exc_info=True
+        )
+        raise RuntimeError(f"Failed to retrieve learning progress: {str(e)}")
 
     if not progress:
-        raise ValueError(f"No progress found for quiz attempt {quiz_attempt_id}")
+        logger.error(
+            f"No learning progress found for quiz attempt {quiz_attempt_id}: "
+            f"user_id={quiz_attempt.user_id}, phrase_id={quiz_attempt.phrase_id}"
+        )
+        raise ValueError(
+            f"No learning progress found for quiz attempt {quiz_attempt_id}. "
+            f"User must search for this phrase before being quizzed."
+        )
+
+    # Validate current stage
+    if not progress.stage or progress.stage not in VALID_STAGES:
+        logger.error(
+            f"Invalid current stage for progress: user_id={quiz_attempt.user_id}, "
+            f"phrase_id={quiz_attempt.phrase_id}, stage='{progress.stage}'"
+        )
+        raise ValueError(f"Invalid learning stage: '{progress.stage}'. Must be one of: {VALID_STAGES}")
 
     # Update metrics
-    progress.times_reviewed += 1
-    if quiz_attempt.was_correct:
-        progress.times_correct += 1
-    else:
-        progress.times_incorrect += 1
+    try:
+        progress.times_reviewed += 1
+        if quiz_attempt.was_correct:
+            progress.times_correct += 1
+        else:
+            progress.times_incorrect += 1
 
-    progress.last_reviewed_at = datetime.utcnow()
+        progress.last_reviewed_at = datetime.utcnow()
 
-    # Check for stage advancement
-    old_stage = progress.stage
-    if _should_advance_stage(progress):
-        progress.stage = _get_next_stage(progress.stage)
+        # Check for stage advancement
+        old_stage = progress.stage
+        if _should_advance_stage(progress):
+            new_stage = _get_next_stage(progress.stage)
 
-        # Reset counters when advancing to new stage
-        progress.times_correct = 0
-        progress.times_incorrect = 0
+            # Validate stage transition
+            if not _is_valid_stage_transition(old_stage, new_stage):
+                logger.error(
+                    f"Invalid stage transition: {old_stage} -> {new_stage} for "
+                    f"user_id={quiz_attempt.user_id}, phrase_id={quiz_attempt.phrase_id}"
+                )
+                raise ValueError(f"Invalid stage transition: {old_stage} -> {new_stage}")
 
-    # Calculate next review date
-    progress.next_review_date = _calculate_next_review(
-        progress=progress,
-        was_correct=quiz_attempt.was_correct
-    )
+            progress.stage = new_stage
+            logger.debug(f"Stage advanced: {old_stage} -> {new_stage}")
 
-    db.session.commit()
+            # Reset counters when advancing to new stage
+            progress.times_correct = 0
+            progress.times_incorrect = 0
 
-    logger.info(
-        f"Updated learning progress after quiz: user_id={quiz_attempt.user_id}, "
-        f"phrase_id={quiz_attempt.phrase_id}, old_stage={old_stage}, "
-        f"new_stage={progress.stage}, was_correct={quiz_attempt.was_correct}"
-    )
+        # Calculate next review date
+        progress.next_review_date = _calculate_next_review(
+            progress=progress,
+            was_correct=quiz_attempt.was_correct
+        )
 
-    return {
-        'old_stage': old_stage,
-        'new_stage': progress.stage,
-        'stage_advanced': old_stage != progress.stage,
-        'next_review_date': progress.next_review_date
-    }
+        # Commit changes with error handling
+        db.session.commit()
+
+        logger.info(
+            f"Updated learning progress after quiz: user_id={quiz_attempt.user_id}, "
+            f"phrase_id={quiz_attempt.phrase_id}, old_stage={old_stage}, "
+            f"new_stage={progress.stage}, was_correct={quiz_attempt.was_correct}"
+        )
+
+        return {
+            'old_stage': old_stage,
+            'new_stage': progress.stage,
+            'stage_advanced': old_stage != progress.stage,
+            'next_review_date': progress.next_review_date
+        }
+
+    except ValueError:
+        # Re-raise validation errors without rollback
+        raise
+    except Exception as e:
+        logger.error(
+            f"Failed to update learning progress for quiz attempt {quiz_attempt_id}: {str(e)}",
+            exc_info=True
+        )
+        db.session.rollback()
+        raise RuntimeError(f"Failed to update learning progress: {str(e)}")
 
 
 def _should_advance_stage(progress: UserLearningProgress) -> bool:
@@ -368,6 +443,55 @@ def _get_next_stage(current_stage: str) -> str:
         STAGE_MASTERED: STAGE_MASTERED
     }
     return stages.get(current_stage, STAGE_BASIC)
+
+
+def _is_valid_stage_transition(from_stage: str, to_stage: str) -> bool:
+    """
+    Validate that a stage transition is allowed.
+
+    The learning progression is ONE-WAY FORWARD only. Users never move backwards,
+    even with incorrect answers. Instead, spaced repetition increases review frequency.
+
+    Valid transitions:
+    - basic → intermediate
+    - intermediate → advanced
+    - advanced → mastered
+    - Any stage → same stage (no advancement)
+
+    Invalid transitions:
+    - Skipping stages (basic → advanced)
+    - Moving backwards (advanced → intermediate, etc.)
+
+    Args:
+        from_stage: Current learning stage
+        to_stage: Target learning stage
+
+    Returns:
+        bool: True if transition is valid, False otherwise
+
+    Example:
+        >>> _is_valid_stage_transition('basic', 'intermediate')
+        True
+        >>> _is_valid_stage_transition('basic', 'basic')
+        True
+        >>> _is_valid_stage_transition('basic', 'advanced')
+        False
+        >>> _is_valid_stage_transition('advanced', 'intermediate')
+        False
+    """
+    # Same stage is always valid (no advancement)
+    if from_stage == to_stage:
+        return True
+
+    # Define valid one-way forward transitions
+    valid_transitions = {
+        STAGE_BASIC: [STAGE_INTERMEDIATE],
+        STAGE_INTERMEDIATE: [STAGE_ADVANCED],
+        STAGE_ADVANCED: [STAGE_MASTERED],
+        STAGE_MASTERED: []  # No progression from mastered (final state)
+    }
+
+    return to_stage in valid_transitions.get(from_stage, [])
 
 
 def _calculate_next_review(progress: UserLearningProgress, was_correct: bool) -> Optional[date]:

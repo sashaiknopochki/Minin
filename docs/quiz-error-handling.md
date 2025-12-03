@@ -223,27 +223,66 @@ logger.error(f"Failed to parse LLM response as JSON: {e}", exc_info=True)
 
 ---
 
-### 4. AnswerEvaluationService (Original Implementation)
+### 4. AnswerEvaluationService ✅
 
 **Location**: `Minin/services/answer_evaluation_service.py`
 
 **Purpose**: Evaluates quiz answers and updates learning progress.
 
-#### Existing Error Handling (Already Good)
+#### Error Handling Improvements
 
-The original implementation already includes:
+##### Input Validation
+- **quiz_attempt_id validation**: Checks if value is positive integer (>0)
+- **User answer validation**: Validates user_answer is not empty or whitespace-only
+- **Quiz attempt existence**: Validates quiz attempt exists in database
+- **Translation validation**: Ensures prompt_json contains question and translation data
 
-✅ Input validation (empty user_answer check)
-✅ Quiz attempt existence validation
-✅ Required fields validation
-✅ Question type validation
-✅ Database transaction safety with rollback
-✅ Comprehensive logging
-✅ Graceful handling of missing learning progress
+##### Error Scenarios Handled
 
-##### Recommended Enhancements
+| Scenario | Error Type | Response |
+|----------|------------|----------|
+| Invalid quiz_attempt_id (≤0, non-int) | `ValueError` | Exception with parameter details |
+| Quiz attempt not found | `ValueError` | "Quiz attempt not found: {id}" |
+| Empty user_answer | `ValueError` | "User answer cannot be empty" |
+| Missing question_type | `ValueError` | "Quiz attempt {id} missing question_type field" |
+| Missing correct_answer | `ValueError` | "Quiz attempt {id} missing correct_answer field" |
+| Missing prompt_json | `ValueError` | "Quiz attempt {id} missing translations in prompt_json" |
+| Malformed prompt_json | Warning | Logs warning but continues (non-fatal) |
+| Unsupported question type | `ValueError` | Clear message listing supported types |
+| Database operation failure | `RuntimeError` | Rollback + exception with context |
 
-While the existing implementation is solid, consider adding:
+##### Logging Strategy
+
+```python
+# Error: Input validation failures
+logger.error(f"Invalid quiz_attempt_id: {quiz_attempt_id}")
+logger.error(f"Empty user_answer for quiz_attempt_id={quiz_attempt_id}")
+logger.error(f"Quiz attempt not found: {quiz_attempt_id}")
+
+# Warning: Degraded functionality
+logger.warning(f"Quiz attempt {id} has malformed prompt_json (missing 'question' field)")
+
+# Info: Successful operations
+logger.info(f"Quiz attempt {id} evaluated: user_answer='{answer}', was_correct={result}")
+```
+
+##### Database Transaction Safety
+
+```python
+try:
+    quiz_attempt.user_answer = user_answer.strip()
+    quiz_attempt.was_correct = was_correct
+    db.session.commit()
+    logger.info(f"Quiz attempt {id} evaluated: was_correct={was_correct}")
+except Exception as e:
+    logger.error(f"Failed to update quiz attempt {id}: {str(e)}", exc_info=True)
+    db.session.rollback()  # CRITICAL: Rollback on failure
+    raise RuntimeError(f"Failed to persist evaluation: {str(e)}")
+```
+
+##### Future Enhancements
+
+Consider adding in future iterations:
 
 1. **Answer length validation** for text input questions
 2. **Sanitization** of user input to prevent injection attacks
@@ -252,30 +291,118 @@ While the existing implementation is solid, consider adding:
 
 ---
 
-### 5. LearningProgressService (Original Implementation)
+### 5. LearningProgressService ✅
 
 **Location**: `Minin/services/learning_progress_service.py`
 
 **Purpose**: Manages user learning progress tracking for spaced repetition.
 
-#### Existing Error Handling (Already Good)
+#### Error Handling Improvements
 
-The original implementation includes:
+##### Input Validation
+- **quiz_attempt_id validation**: Type checking (must be positive integer)
+- **Quiz attempt field validation**: Validates user_id, phrase_id, and was_correct exist
+- **Progress record validation**: Ensures learning progress exists before update
+- **Stage validation**: Validates current stage is one of the valid stages
+- **Stage transition validation**: Prevents invalid stage transitions (skipping or backwards)
 
-✅ Database operation error handling
-✅ Rollback on failures
-✅ Logging of errors with context
-✅ Graceful handling of missing progress records
-✅ Validation of stage transitions
+##### Error Scenarios Handled
 
-##### Recommended Enhancements
+| Scenario | Error Type | Response |
+|----------|------------|----------|
+| Invalid quiz_attempt_id (≤0, non-int) | `ValueError` | Exception: "quiz_attempt_id must be a positive integer" |
+| Quiz attempt not found | `ValueError` | "Quiz attempt {id} not found" |
+| Missing user_id | `ValueError` | "Quiz attempt {id} missing user_id" |
+| Missing phrase_id | `ValueError` | "Quiz attempt {id} missing phrase_id" |
+| Missing was_correct | `ValueError` | "Quiz attempt {id} missing was_correct field" |
+| Progress record not found | `ValueError` | "No learning progress found. User must search first." |
+| Invalid current stage | `ValueError` | "Invalid learning stage: '{stage}'. Must be one of: [...]" |
+| Invalid stage transition | `ValueError` | "Invalid stage transition: {old} -> {new}" |
+| Database query failure | `RuntimeError` | Logs error with context, raises with details |
+| Database commit failure | `RuntimeError` | Rollback + exception with context |
 
-Consider adding:
+##### Stage Transition Validation
 
-1. **Stage transition validation** to prevent invalid progressions
-2. **Date validation** for next_review_date
-3. **Counter overflow protection** for times_reviewed
-4. **Concurrent update detection** for progress records
+The service implements **one-way forward progression** only:
+
+```python
+def _is_valid_stage_transition(from_stage: str, to_stage: str) -> bool:
+    """
+    Validate stage transitions. Progression is one-way forward.
+    Users never move backwards, even with incorrect answers.
+    Spaced repetition handles struggling learners via review frequency.
+
+    Valid: basic → intermediate → advanced → mastered
+    Invalid: Skipping stages or moving backwards
+    """
+    if from_stage == to_stage:
+        return True  # No advancement is valid
+
+    valid_transitions = {
+        STAGE_BASIC: [STAGE_INTERMEDIATE],
+        STAGE_INTERMEDIATE: [STAGE_ADVANCED],
+        STAGE_ADVANCED: [STAGE_MASTERED],
+        STAGE_MASTERED: []  # Final state
+    }
+    return to_stage in valid_transitions.get(from_stage, [])
+```
+
+**Design Philosophy:**
+- No backwards transitions (even with repeated incorrect answers)
+- Incorrect answers increase review frequency instead of demoting stage
+- More encouraging for learners (permanent progress)
+- Simpler logic and clearer mental model
+
+##### Logging Strategy
+
+```python
+# Debug: Stage advancement details
+logger.debug(f"Stage advanced: {old_stage} -> {new_stage}")
+
+# Info: Successful progress updates
+logger.info(
+    f"Updated learning progress after quiz: user_id={user_id}, "
+    f"phrase_id={phrase_id}, old_stage={old}, new_stage={new}, "
+    f"was_correct={correct}"
+)
+
+# Warning: Unexpected but recoverable conditions
+logger.warning(f"Learning progress already exists for user_id={uid}, phrase_id={pid}")
+
+# Error: Validation failures and database errors
+logger.error(f"Invalid current stage: '{stage}'. Must be one of: {VALID_STAGES}")
+logger.error(f"Database error retrieving quiz attempt {id}: {e}", exc_info=True)
+```
+
+##### Database Transaction Safety
+
+```python
+try:
+    # Update metrics and stage
+    progress.times_reviewed += 1
+    progress.times_correct += 1 if was_correct else 0
+    progress.times_incorrect += 0 if was_correct else 1
+    progress.stage = new_stage if should_advance else old_stage
+    progress.next_review_date = calculate_next_review(progress, was_correct)
+
+    db.session.commit()
+    logger.info(f"Updated learning progress: user_id={uid}, phrase_id={pid}")
+
+except ValueError:
+    raise  # Re-raise validation errors without rollback
+except Exception as e:
+    logger.error(f"Failed to update progress: {str(e)}", exc_info=True)
+    db.session.rollback()  # CRITICAL: Rollback on failure
+    raise RuntimeError(f"Failed to update learning progress: {str(e)}")
+```
+
+##### Future Enhancements
+
+Consider adding in future iterations:
+
+1. **Counter overflow protection** for times_reviewed (e.g., max value checks)
+2. **Concurrent update detection** using optimistic locking or version fields
+3. **Audit trail** for stage changes (history table)
 
 ---
 
@@ -497,8 +624,8 @@ If critical issues occur:
 
 ### Short Term (1-2 months)
 
-1. Add error handling to AnswerEvaluationService (enhancements)
-2. Add error handling to LearningProgressService (enhancements)
+1. ✅ ~~Add error handling to AnswerEvaluationService~~ (Completed 2025-12-03)
+2. ✅ ~~Add error handling to LearningProgressService~~ (Completed 2025-12-03)
 3. Implement circuit breaker pattern for LLM API
 4. Add request/response caching for duplicate questions
 

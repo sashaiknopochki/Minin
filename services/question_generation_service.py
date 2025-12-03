@@ -9,6 +9,7 @@ import os
 import json
 import logging
 import time
+import random
 from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -277,6 +278,23 @@ class QuestionGenerationService:
             )
 
     @staticmethod
+    def _shuffle_options(options: List[str], correct_answer: Any) -> List[str]:
+        """
+        Shuffle multiple choice options to randomize correct answer position.
+
+        Args:
+            options: List of answer options
+            correct_answer: The correct answer (string or list of strings)
+
+        Returns:
+            List of shuffled options
+        """
+        # Create a copy to avoid modifying the original list
+        shuffled = options.copy()
+        random.shuffle(shuffled)
+        return shuffled
+
+    @staticmethod
     def _generate_multiple_choice_target(
         client: OpenAI,
         phrase_text: str,
@@ -311,7 +329,8 @@ Requirements:
 3. If the word has multiple meanings, list ALL valid translations in correct_answer as an array
 4. Distractors should be plausible words in {native_lang_name} but clearly wrong for this phrase
 5. Distractors should be at similar difficulty level (don't use obvious unrelated words)
-6. Return ONLY valid JSON, no other text
+6. The order of options in your response doesn't matter - they will be randomized
+7. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -348,12 +367,18 @@ If multiple meanings exist, use this format:
             if not isinstance(result['options'], list) or len(result['options']) != 4:
                 raise ValueError(f"LLM response must have exactly 4 options")
 
+            # Shuffle the options to randomize correct answer position
+            shuffled_options = QuestionGenerationService._shuffle_options(
+                result['options'],
+                result['correct_answer']
+            )
+
             logger.info(f"Generated multiple_choice_target question for '{phrase_text}'")
 
             return {
                 'prompt': {
                     'question': result['question'],
-                    'options': result['options'],
+                    'options': shuffled_options,
                     'question_language': result['question_language'],
                     'answer_language': result['answer_language']
                 },
@@ -420,7 +445,8 @@ Requirements:
 2. Generate 4 options in {source_lang_name}: 1 correct ('{phrase_text}') + 3 distractors
 3. Distractors should be plausible {source_lang_name} words but clearly wrong for this meaning
 4. Distractors should be at similar difficulty level
-5. Return ONLY valid JSON, no other text
+5. The order of options in your response doesn't matter - they will be randomized
+6. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -448,12 +474,18 @@ Return format:
             if not isinstance(result['options'], list) or len(result['options']) != 4:
                 raise ValueError(f"LLM response must have exactly 4 options")
 
+            # Shuffle the options to randomize correct answer position
+            shuffled_options = QuestionGenerationService._shuffle_options(
+                result['options'],
+                result['correct_answer']
+            )
+
             logger.info(f"Generated multiple_choice_source question for '{phrase_text}'")
 
             return {
                 'prompt': {
                     'question': result['question'],
-                    'options': result['options'],
+                    'options': shuffled_options,
                     'question_language': result['question_language'],
                     'answer_language': result['answer_language']
                 },

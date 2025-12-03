@@ -76,7 +76,7 @@ export function QuizDialog({
   }
 
   const getButtonClassName = (option: string) => {
-    const baseClasses = "w-full h-auto py-4 px-4 text-base font-normal justify-start hover:bg-accent hover:border-accent-foreground/20"
+    const baseClasses = "w-full h-auto py-4 px-4 text-lg font-normal justify-start hover:bg-accent hover:border-accent-foreground/20"
 
     if (!result) return baseClasses
 

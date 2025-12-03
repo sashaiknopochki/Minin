@@ -34,13 +34,15 @@ class AnswerEvaluationService:
         user's learning progress metrics for spaced repetition tracking.
 
         Workflow:
-        1. Retrieve and validate quiz attempt
-        2. Validate question type (MVP: multiple choice only)
-        3. Extract valid answers from correct_answer field
-        4. Evaluate user's answer
-        5. Update quiz_attempt with user_answer and was_correct
-        6. Update learning progress metrics
-        7. Return evaluation result
+        1. Validate inputs (quiz_attempt_id and user_answer)
+        2. Retrieve and validate quiz attempt exists
+        3. Validate question type (MVP: multiple choice only)
+        4. Validate required fields (correct_answer, prompt_json for translations)
+        5. Extract valid answers from correct_answer field
+        6. Evaluate user's answer
+        7. Update quiz_attempt with user_answer and was_correct
+        8. Update learning progress metrics
+        9. Return evaluation result
 
         Args:
             quiz_attempt_id (int): The ID of the quiz attempt to evaluate
@@ -53,8 +55,9 @@ class AnswerEvaluationService:
                 - explanation (str): Simple feedback message
 
         Raises:
-            ValueError: If quiz_attempt not found, user_answer is empty,
-                       question_type is unsupported, or required fields are missing
+            ValueError: If quiz_attempt_id is invalid, quiz_attempt not found,
+                       user_answer is empty, question_type is unsupported,
+                       required fields are missing, or translations are missing
             RuntimeError: If database operations fail
 
         Examples:
@@ -74,20 +77,41 @@ class AnswerEvaluationService:
             - Updates are atomic: quiz_attempt and learning_progress or rollback
             - Missing learning progress logs warning but doesn't fail evaluation
         """
-        # Validate input
+        # Validate quiz_attempt_id
+        if not isinstance(quiz_attempt_id, int) or quiz_attempt_id <= 0:
+            logger.error(f"Invalid quiz_attempt_id: {quiz_attempt_id}")
+            raise ValueError(f"quiz_attempt_id must be a positive integer, got: {quiz_attempt_id}")
+
+        # Validate user_answer is not empty
         if not user_answer or not user_answer.strip():
+            logger.error(f"Empty user_answer for quiz_attempt_id={quiz_attempt_id}")
             raise ValueError("User answer cannot be empty")
 
         # Retrieve quiz attempt
         quiz_attempt = QuizAttempt.query.get(quiz_attempt_id)
         if not quiz_attempt:
+            logger.error(f"Quiz attempt not found: {quiz_attempt_id}")
             raise ValueError(f"Quiz attempt not found: {quiz_attempt_id}")
 
         # Validate required fields
         if not quiz_attempt.question_type:
-            raise ValueError("Quiz attempt missing question_type field")
+            logger.error(f"Quiz attempt {quiz_attempt_id} missing question_type field")
+            raise ValueError(f"Quiz attempt {quiz_attempt_id} missing question_type field")
+
         if not quiz_attempt.correct_answer:
-            raise ValueError("Quiz attempt missing correct_answer field")
+            logger.error(f"Quiz attempt {quiz_attempt_id} missing correct_answer field")
+            raise ValueError(f"Quiz attempt {quiz_attempt_id} missing correct_answer field")
+
+        # Validate translations are available in prompt_json
+        if not quiz_attempt.prompt_json:
+            logger.error(f"Quiz attempt {quiz_attempt_id} missing prompt_json (translations)")
+            raise ValueError(f"Quiz attempt {quiz_attempt_id} missing translations in prompt_json")
+
+        # Ensure prompt_json contains the question
+        prompt_data = quiz_attempt.prompt_json if isinstance(quiz_attempt.prompt_json, dict) else {}
+        if not prompt_data.get('question'):
+            logger.warning(f"Quiz attempt {quiz_attempt_id} has malformed prompt_json (missing 'question' field)")
+            # Don't fail, but log for monitoring
 
         # Validate question type (MVP: multiple choice only)
         supported_types = ['multiple_choice_target', 'multiple_choice_source']
