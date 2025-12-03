@@ -5,17 +5,22 @@ This service is responsible for creating quiz attempts and selecting
 appropriate question types based on the user's learning stage.
 """
 
+import logging
 import random
+from typing import Optional
 from models import db
 from models.quiz_attempt import QuizAttempt
 from models.user_learning_progress import UserLearningProgress
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class QuizAttemptService:
     """Service to create quiz attempt records with appropriate question types"""
 
     @staticmethod
-    def create_quiz_attempt(user_id, phrase_id):
+    def create_quiz_attempt(user_id: int, phrase_id: int) -> QuizAttempt:
         """
         Create a new quiz attempt record.
 
@@ -44,7 +49,8 @@ class QuizAttemptService:
                 - user_answer: None (to be filled when user submits)
 
         Raises:
-            ValueError: If no learning progress exists for the user-phrase pair
+            ValueError: If no learning progress exists, invalid IDs, or invalid stage
+            RuntimeError: If database operation fails
 
         Examples:
             >>> quiz_attempt = QuizAttemptService.create_quiz_attempt(
@@ -60,37 +66,87 @@ class QuizAttemptService:
             - AnswerEvaluationService will update was_correct after user answers
             - The method uses flush() instead of commit() to allow transaction control
         """
-        # Get learning progress
-        progress = UserLearningProgress.query.filter_by(
-            user_id=user_id,
-            phrase_id=phrase_id
-        ).first()
+        # Validate inputs
+        if not user_id or not isinstance(user_id, int) or user_id <= 0:
+            logger.error(f"Invalid user_id: {user_id}")
+            raise ValueError(f"Invalid user_id: {user_id}")
 
-        if not progress:
-            raise ValueError(f"No learning progress found for user {user_id}, phrase {phrase_id}")
+        if not phrase_id or not isinstance(phrase_id, int) or phrase_id <= 0:
+            logger.error(f"Invalid phrase_id: {phrase_id}")
+            raise ValueError(f"Invalid phrase_id: {phrase_id}")
 
-        # Determine question type based on stage
-        question_type = QuizAttemptService.select_question_type(progress.stage)
+        try:
+            # Get learning progress
+            progress = UserLearningProgress.query.filter_by(
+                user_id=user_id,
+                phrase_id=phrase_id
+            ).first()
 
-        # Create quiz attempt (without prompt_json yet - that's for question generation)
-        quiz_attempt = QuizAttempt(
-            user_id=user_id,
-            phrase_id=phrase_id,
-            question_type=question_type,
-            was_correct=False  # Placeholder - will be updated by AnswerEvaluationService
-            # prompt_json will be filled by QuestionGenerationService
-            # correct_answer will be filled by QuestionGenerationService
-            # user_answer will be filled when user submits answer
-            # was_correct will be updated by AnswerEvaluationService
-        )
+            if not progress:
+                logger.error(
+                    f"No learning progress found for user_id={user_id}, phrase_id={phrase_id}"
+                )
+                raise ValueError(
+                    f"No learning progress found for user {user_id}, phrase {phrase_id}. "
+                    f"User must search for this phrase before being quizzed on it."
+                )
 
-        db.session.add(quiz_attempt)
-        db.session.flush()  # Get quiz_attempt.id without committing transaction
+            # Validate stage
+            if not progress.stage:
+                logger.error(
+                    f"Learning progress missing stage: user_id={user_id}, phrase_id={phrase_id}"
+                )
+                raise ValueError(
+                    f"Learning progress for user {user_id}, phrase {phrase_id} has no stage"
+                )
 
-        return quiz_attempt
+            # Determine question type based on stage
+            try:
+                question_type = QuizAttemptService.select_question_type(progress.stage)
+            except ValueError as e:
+                logger.error(
+                    f"Failed to select question type for stage={progress.stage}: {str(e)}"
+                )
+                raise ValueError(
+                    f"Cannot create quiz for stage '{progress.stage}': {str(e)}"
+                )
+
+            # Create quiz attempt (without prompt_json yet - that's for question generation)
+            quiz_attempt = QuizAttempt(
+                user_id=user_id,
+                phrase_id=phrase_id,
+                question_type=question_type,
+                was_correct=False  # Placeholder - will be updated by AnswerEvaluationService
+                # prompt_json will be filled by QuestionGenerationService
+                # correct_answer will be filled by QuestionGenerationService
+                # user_answer will be filled when user submits answer
+                # was_correct will be updated by AnswerEvaluationService
+            )
+
+            db.session.add(quiz_attempt)
+            db.session.flush()  # Get quiz_attempt.id without committing transaction
+
+            logger.info(
+                f"Created quiz attempt: id={quiz_attempt.id}, user_id={user_id}, "
+                f"phrase_id={phrase_id}, question_type={question_type}, stage={progress.stage}"
+            )
+
+            return quiz_attempt
+
+        except ValueError:
+            # Re-raise ValueError for proper error propagation
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to create quiz attempt for user_id={user_id}, "
+                f"phrase_id={phrase_id}: {str(e)}",
+                exc_info=True
+            )
+            db.session.rollback()
+            raise RuntimeError(f"Failed to create quiz attempt: {str(e)}")
 
     @staticmethod
-    def select_question_type(stage):
+    def select_question_type(stage: str) -> str:
         """
         Select appropriate question type based on learning stage.
 
@@ -119,7 +175,7 @@ class QuizAttemptService:
             str: Randomly selected question type from the stage's pool
 
         Raises:
-            ValueError: If stage is invalid or 'mastered' (mastered phrases shouldn't be quizzed)
+            ValueError: If stage is invalid, None, empty, or 'mastered'
 
         Examples:
             >>> type1 = QuizAttemptService.select_question_type('basic')
@@ -140,6 +196,17 @@ class QuizAttemptService:
             - Mastered phrases should never reach this function (filtered earlier)
             - Question types align with cognitive progression: recognition → recall → application
         """
+        # Validate stage input
+        if not stage or not isinstance(stage, str):
+            logger.error(f"Invalid stage type: {type(stage)}, value: {stage}")
+            raise ValueError(f"Stage must be a non-empty string, got: {stage}")
+
+        stage = stage.strip().lower()
+
+        if not stage:
+            logger.error("Empty stage after stripping")
+            raise ValueError("Stage cannot be empty")
+
         question_types = {
             'basic': ['multiple_choice_target', 'multiple_choice_source'],
             'intermediate': ['text_input_target', 'text_input_source'],
@@ -149,6 +216,21 @@ class QuizAttemptService:
 
         types = question_types.get(stage, [])
         if not types:
-            raise ValueError(f"Invalid stage: {stage}")
+            valid_stages = [s for s, t in question_types.items() if t]
+            logger.error(
+                f"Invalid or mastered stage: '{stage}'. "
+                f"Valid stages: {', '.join(valid_stages)}"
+            )
+            raise ValueError(
+                f"Invalid stage: '{stage}'. Mastered phrases should not be quizzed. "
+                f"Valid stages: {', '.join(valid_stages)}"
+            )
 
-        return random.choice(types)
+        try:
+            selected_type = random.choice(types)
+            logger.debug(f"Selected question type '{selected_type}' for stage '{stage}'")
+            return selected_type
+        except IndexError:
+            # This should never happen due to the check above, but defensive programming
+            logger.error(f"Unexpected empty types list for stage '{stage}'")
+            raise ValueError(f"No question types available for stage: {stage}")

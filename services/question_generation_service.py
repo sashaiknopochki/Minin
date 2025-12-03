@@ -8,9 +8,11 @@ MVP implementation supports only multiple choice questions.
 import os
 import json
 import logging
-from typing import Dict, Any, Optional
+import time
+from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 from openai import OpenAI
+from openai import APIError, APIConnectionError, RateLimitError, APITimeoutError
 
 from models import db
 from models.quiz_attempt import QuizAttempt
@@ -27,6 +29,11 @@ logger = logging.getLogger(__name__)
 GPT_4_1_MINI = "gpt-4.1-mini"
 DEFAULT_MODEL = GPT_4_1_MINI
 
+# Retry configuration
+MAX_RETRIES = 3
+INITIAL_RETRY_DELAY = 1.0  # seconds
+MAX_RETRY_DELAY = 10.0  # seconds
+
 
 class QuestionGenerationService:
     """Service to generate quiz questions using LLM"""
@@ -34,11 +41,13 @@ class QuestionGenerationService:
     @staticmethod
     def generate_question(quiz_attempt: QuizAttempt) -> Dict[str, Any]:
         """
-        Generate quiz question via LLM.
+        Generate quiz question via LLM with fallback support.
 
         This method creates a complete quiz question with options and correct answer
         using an LLM. It retrieves all necessary data (phrase, translations, context)
         and calls the LLM to generate an appropriate question based on the question type.
+
+        If LLM generation fails after retries, falls back to hardcoded question generation.
 
         Updates quiz_attempt with:
         - prompt_json: Complete question data (question, options, languages)
@@ -56,7 +65,7 @@ class QuestionGenerationService:
 
         Raises:
             ValueError: If quiz_attempt is invalid or required data is missing
-            RuntimeError: If LLM API call fails
+            RuntimeError: If both LLM and fallback generation fail
 
         Examples:
             >>> quiz_attempt = QuizAttemptService.create_quiz_attempt(user_id=1, phrase_id=42)
@@ -71,65 +80,125 @@ class QuestionGenerationService:
             - Uses db.session.commit() to persist changes
             - Extracts translations from phrase_translations table
             - Retrieves context sentences from user_searches if available
+            - Falls back to simple questions if LLM fails
         """
+        # Validate quiz_attempt
         if not quiz_attempt:
+            logger.error("generate_question called with None quiz_attempt")
             raise ValueError("quiz_attempt cannot be None")
 
-        # Get phrase and user
-        phrase = Phrase.query.get(quiz_attempt.phrase_id)
-        user = User.query.get(quiz_attempt.user_id)
+        if not hasattr(quiz_attempt, 'id') or not quiz_attempt.id:
+            logger.error("quiz_attempt missing id")
+            raise ValueError("quiz_attempt must have a valid id")
 
-        if not phrase:
-            raise ValueError(f"Phrase not found: {quiz_attempt.phrase_id}")
-        if not user:
-            raise ValueError(f"User not found: {quiz_attempt.user_id}")
+        try:
+            # Get phrase and user
+            phrase = Phrase.query.get(quiz_attempt.phrase_id)
+            user = User.query.get(quiz_attempt.user_id)
 
-        # Get all translations for this phrase
-        translations = PhraseTranslation.query.filter_by(
-            phrase_id=phrase.id
-        ).all()
+            if not phrase:
+                logger.error(f"Phrase not found: {quiz_attempt.phrase_id}")
+                raise ValueError(f"Phrase not found: {quiz_attempt.phrase_id}")
+            if not user:
+                logger.error(f"User not found: {quiz_attempt.user_id}")
+                raise ValueError(f"User not found: {quiz_attempt.user_id}")
 
-        if not translations:
-            raise ValueError(f"No translations found for phrase: {phrase.id}")
+            if not phrase.text:
+                logger.error(f"Phrase {phrase.id} has no text")
+                raise ValueError(f"Phrase {phrase.id} has no text")
 
-        # Get context sentence if available (most recent search by this user)
-        context = UserSearch.query.filter_by(
-            user_id=user.id,
-            phrase_id=phrase.id
-        ).order_by(UserSearch.searched_at.desc()).first()
+            # Get all translations for this phrase
+            translations = PhraseTranslation.query.filter_by(
+                phrase_id=phrase.id
+            ).all()
 
-        context_sentence = context.context_sentence if context else None
+            if not translations:
+                logger.error(f"No translations found for phrase: {phrase.id}")
+                raise ValueError(
+                    f"No translations found for phrase: {phrase.id}. "
+                    f"Cannot generate quiz without translation data."
+                )
 
-        # Build translation data for LLM
-        translations_data = {}
-        for trans in translations:
-            lang = Language.query.get(trans.target_language_code)
-            if lang:
-                translations_data[lang.en_name] = trans.translations_json
+            # Get context sentence if available (most recent search by this user)
+            context = UserSearch.query.filter_by(
+                user_id=user.id,
+                phrase_id=phrase.id
+            ).order_by(UserSearch.searched_at.desc()).first()
 
-        # Generate question based on type
-        question_data = QuestionGenerationService._call_llm_for_question(
-            question_type=quiz_attempt.question_type,
-            phrase_text=phrase.text,
-            phrase_language=phrase.language_code,
-            translations=translations_data,
-            native_language=user.primary_language_code,
-            context_sentence=context_sentence
-        )
+            context_sentence = context.context_sentence if context else None
 
-        # Update quiz attempt
-        quiz_attempt.prompt_json = question_data['prompt']
+            # Build translation data for LLM
+            translations_data = {}
+            for trans in translations:
+                try:
+                    lang = Language.query.get(trans.target_language_code)
+                    if lang and trans.translations_json:
+                        translations_data[lang.en_name] = trans.translations_json
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to process translation {trans.id}: {str(e)}"
+                    )
+                    continue
 
-        # Handle correct_answer: convert list to JSON string if needed
-        correct_answer = question_data['correct_answer']
-        if isinstance(correct_answer, list):
-            quiz_attempt.correct_answer = json.dumps(correct_answer)
-        else:
-            quiz_attempt.correct_answer = correct_answer
+            if not translations_data:
+                logger.error(f"No valid translation data for phrase: {phrase.id}")
+                raise ValueError(
+                    f"No valid translation data for phrase: {phrase.id}"
+                )
 
-        db.session.commit()
+            # Try to generate question via LLM
+            try:
+                question_data = QuestionGenerationService._call_llm_for_question(
+                    question_type=quiz_attempt.question_type,
+                    phrase_text=phrase.text,
+                    phrase_language=phrase.language_code,
+                    translations=translations_data,
+                    native_language=user.primary_language_code,
+                    context_sentence=context_sentence
+                )
+            except (APIError, APIConnectionError, RateLimitError, APITimeoutError, RuntimeError) as e:
+                # LLM failed, use fallback
+                logger.warning(
+                    f"LLM generation failed for quiz_attempt {quiz_attempt.id}: {str(e)}. "
+                    f"Using fallback question generation."
+                )
+                question_data = QuestionGenerationService._generate_fallback_question(
+                    question_type=quiz_attempt.question_type,
+                    phrase_text=phrase.text,
+                    phrase_language=phrase.language_code,
+                    translations=translations_data,
+                    native_language=user.primary_language_code
+                )
 
-        return question_data['prompt']
+            # Update quiz attempt
+            quiz_attempt.prompt_json = question_data['prompt']
+
+            # Handle correct_answer: convert list to JSON string if needed
+            correct_answer = question_data['correct_answer']
+            if isinstance(correct_answer, list):
+                quiz_attempt.correct_answer = json.dumps(correct_answer)
+            else:
+                quiz_attempt.correct_answer = correct_answer
+
+            db.session.commit()
+
+            logger.info(
+                f"Generated question for quiz_attempt {quiz_attempt.id}: "
+                f"phrase='{phrase.text}', type={quiz_attempt.question_type}"
+            )
+
+            return question_data['prompt']
+
+        except ValueError:
+            # Re-raise ValueError for proper error propagation
+            raise
+        except Exception as e:
+            logger.error(
+                f"Failed to generate question for quiz_attempt {quiz_attempt.id}: {str(e)}",
+                exc_info=True
+            )
+            db.session.rollback()
+            raise RuntimeError(f"Failed to generate question: {str(e)}")
 
     @staticmethod
     def _call_llm_for_question(
@@ -264,19 +333,20 @@ If multiple meanings exist, use this format:
 """
 
         try:
-            # Call OpenAI API
-            response = client.chat.completions.create(
-                model=DEFAULT_MODEL,
-                messages=[
-                    {"role": "system", "content": "You are a language learning quiz generator. Return only valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=500
-            )
+            # Call OpenAI API with retry logic
+            content = QuestionGenerationService._call_api_with_retry(client, prompt)
 
             # Parse JSON response
-            result = json.loads(response.choices[0].message.content)
+            result = json.loads(content)
+
+            # Validate response structure
+            required_fields = ['question', 'options', 'correct_answer', 'question_language', 'answer_language']
+            for field in required_fields:
+                if field not in result:
+                    raise ValueError(f"LLM response missing required field: {field}")
+
+            if not isinstance(result['options'], list) or len(result['options']) != 4:
+                raise ValueError(f"LLM response must have exactly 4 options")
 
             logger.info(f"Generated multiple_choice_target question for '{phrase_text}'")
 
@@ -292,8 +362,12 @@ If multiple meanings exist, use this format:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {response.choices[0].message.content}")
+            logger.error(f"Response content: {content}")
             raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
 
         except Exception as e:
             logger.error(f"Error calling OpenAI API: {e}")
@@ -359,19 +433,20 @@ Return format:
 """
 
         try:
-            # Call OpenAI API
-            response = client.chat.completions.create(
-                model=DEFAULT_MODEL,
-                messages=[
-                    {"role": "system", "content": "You are a language learning quiz generator. Return only valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=500
-            )
+            # Call OpenAI API with retry logic
+            content = QuestionGenerationService._call_api_with_retry(client, prompt)
 
             # Parse JSON response
-            result = json.loads(response.choices[0].message.content)
+            result = json.loads(content)
+
+            # Validate response structure
+            required_fields = ['question', 'options', 'correct_answer', 'question_language', 'answer_language']
+            for field in required_fields:
+                if field not in result:
+                    raise ValueError(f"LLM response missing required field: {field}")
+
+            if not isinstance(result['options'], list) or len(result['options']) != 4:
+                raise ValueError(f"LLM response must have exactly 4 options")
 
             logger.info(f"Generated multiple_choice_source question for '{phrase_text}'")
 
@@ -387,9 +462,188 @@ Return format:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {response.choices[0].message.content}")
+            logger.error(f"Response content: {content}")
             raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
 
         except Exception as e:
             logger.error(f"Error calling OpenAI API: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
+
+    @staticmethod
+    def _generate_fallback_question(
+        question_type: str,
+        phrase_text: str,
+        phrase_language: str,
+        translations: Dict[str, Any],
+        native_language: str
+    ) -> Dict[str, Any]:
+        """
+        Generate a simple fallback question when LLM fails.
+
+        This provides a basic question without LLM-generated distractors.
+        Uses placeholder distractors to ensure quiz functionality continues.
+
+        Args:
+            question_type: Type of question
+            phrase_text: The word/phrase to quiz on
+            phrase_language: Language code of the phrase
+            translations: Dict of translations by language name
+            native_language: User's native language code
+
+        Returns:
+            dict: Question data in same format as LLM-generated questions
+
+        Raises:
+            ValueError: If unable to extract translation data
+        """
+        logger.info(f"Generating fallback question for '{phrase_text}'")
+
+        try:
+            # Get language names
+            native_lang = Language.query.get(native_language)
+            native_lang_name = native_lang.en_name if native_lang else "English"
+
+            source_lang = Language.query.get(phrase_language)
+            source_lang_name = source_lang.en_name if source_lang else phrase_language
+
+            # Extract correct answer from translations
+            correct_answer = "translation"
+            if translations:
+                # Try to find native language translation
+                if native_lang_name in translations:
+                    trans_data = translations[native_lang_name]
+                    if isinstance(trans_data, dict):
+                        # Try different structures
+                        for key in trans_data:
+                            if isinstance(trans_data[key], list) and trans_data[key]:
+                                if isinstance(trans_data[key][0], list) and trans_data[key][0]:
+                                    correct_answer = trans_data[key][0][0]
+                                    break
+                                elif isinstance(trans_data[key][0], str):
+                                    correct_answer = trans_data[key][0]
+                                    break
+
+            if question_type == 'multiple_choice_target':
+                # Source language phrase → native language translation
+                return {
+                    'prompt': {
+                        'question': f"What is the {native_lang_name} translation of '{phrase_text}'?",
+                        'options': [
+                            correct_answer,
+                            "[option 2]",
+                            "[option 3]",
+                            "[option 4]"
+                        ],
+                        'question_language': native_language,
+                        'answer_language': native_language
+                    },
+                    'correct_answer': correct_answer
+                }
+
+            elif question_type == 'multiple_choice_source':
+                # Native language translation → source language phrase
+                return {
+                    'prompt': {
+                        'question': f"What is the {source_lang_name} word for '{correct_answer}'?",
+                        'options': [
+                            phrase_text,
+                            "[option 2]",
+                            "[option 3]",
+                            "[option 4]"
+                        ],
+                        'question_language': native_language,
+                        'answer_language': phrase_language
+                    },
+                    'correct_answer': phrase_text
+                }
+
+            else:
+                raise ValueError(f"Unsupported question type for fallback: {question_type}")
+
+        except Exception as e:
+            logger.error(f"Failed to generate fallback question: {str(e)}", exc_info=True)
+            raise ValueError(f"Unable to generate fallback question: {str(e)}")
+
+    @staticmethod
+    def _call_api_with_retry(
+        client: OpenAI,
+        prompt: str,
+        system_message: str = "You are a language learning quiz generator. Return only valid JSON."
+    ) -> str:
+        """
+        Call OpenAI API with exponential backoff retry logic.
+
+        Args:
+            client: OpenAI client instance
+            prompt: The user prompt
+            system_message: The system message
+
+        Returns:
+            str: The API response content
+
+        Raises:
+            RuntimeError: If all retries fail
+        """
+        retry_delay = INITIAL_RETRY_DELAY
+
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                logger.debug(f"API call attempt {attempt}/{MAX_RETRIES}")
+
+                response = client.chat.completions.create(
+                    model=DEFAULT_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=500,
+                    timeout=30.0  # 30 second timeout
+                )
+
+                content = response.choices[0].message.content
+                logger.debug(f"API call succeeded on attempt {attempt}")
+                return content
+
+            except RateLimitError as e:
+                logger.warning(f"Rate limit hit on attempt {attempt}: {str(e)}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+                else:
+                    raise RuntimeError(f"Rate limit exceeded after {MAX_RETRIES} attempts")
+
+            except APITimeoutError as e:
+                logger.warning(f"API timeout on attempt {attempt}: {str(e)}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+                else:
+                    raise RuntimeError(f"API timeout after {MAX_RETRIES} attempts")
+
+            except APIConnectionError as e:
+                logger.warning(f"Connection error on attempt {attempt}: {str(e)}")
+                if attempt < MAX_RETRIES:
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+                else:
+                    raise RuntimeError(f"Connection failed after {MAX_RETRIES} attempts")
+
+            except APIError as e:
+                logger.error(f"API error on attempt {attempt}: {str(e)}")
+                if attempt < MAX_RETRIES and e.status_code >= 500:
+                    # Retry on server errors
+                    time.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+                else:
+                    raise RuntimeError(f"API error: {str(e)}")
+
+            except Exception as e:
+                logger.error(f"Unexpected error on attempt {attempt}: {str(e)}")
+                raise RuntimeError(f"Unexpected API error: {str(e)}")
+
+        raise RuntimeError(f"Failed after {MAX_RETRIES} attempts")
