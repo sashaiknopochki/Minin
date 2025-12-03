@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Check, X } from "lucide-react"
+import { Check, X, Loader2 } from "lucide-react"
 
 export interface QuizData {
   quiz_attempt_id: number
@@ -32,6 +32,7 @@ export interface QuizDialogProps {
   onSkip: () => void
   onContinue?: () => void
   result?: QuizResult | null
+  isLoading?: boolean
 }
 
 export function QuizDialog({
@@ -42,6 +43,7 @@ export function QuizDialog({
   onSkip,
   onContinue,
   result,
+  isLoading = false,
 }: QuizDialogProps) {
   const handleAnswerClick = (answer: string) => {
     if (!result) {
@@ -135,36 +137,43 @@ export function QuizDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-6 space-y-4">
-          <h3 className="text-2xl font-semibold mb-6 text-foreground leading-relaxed">
-            {quizData.question}
-          </h3>
-
-          <div className="flex flex-col gap-3">
-            {quizData.options.map((option, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                onClick={() => handleAnswerClick(option)}
-                disabled={!!result}
-                className={getButtonClassName(option)}
-              >
-                <span className={getButtonTextClassName(option)}>
-                  {option}
-                </span>
-                {getButtonIcon(option)}
-              </Button>
-            ))}
+        {isLoading ? (
+          <div className="py-6 flex items-center justify-center min-h-[300px]">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : (
+          <div className="py-6 space-y-4">
+            <h3 className="text-2xl font-semibold mb-6 text-foreground leading-relaxed">
+              {quizData.question}
+            </h3>
 
-          {getFeedbackMessage()}
-        </div>
+            <div className="flex flex-col gap-3">
+              {quizData.options.map((option, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  onClick={() => handleAnswerClick(option)}
+                  disabled={!!result}
+                  className={getButtonClassName(option)}
+                >
+                  <span className={getButtonTextClassName(option)}>
+                    {option}
+                  </span>
+                  {getButtonIcon(option)}
+                </Button>
+              ))}
+            </div>
+
+            {getFeedbackMessage()}
+          </div>
+        )}
 
         <DialogFooter className="gap-2 sm:justify-between">
           {!result ? (
             <Button
               variant="outline"
               onClick={onSkip}
+              disabled={isLoading}
               className="w-full sm:w-auto"
             >
               Skip for now
@@ -174,6 +183,7 @@ export function QuizDialog({
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={isLoading}
                 className="w-full sm:w-auto"
               >
                 Back to Translator
@@ -182,6 +192,7 @@ export function QuizDialog({
                 <Button
                   variant="default"
                   onClick={onContinue}
+                  disabled={isLoading}
                   className="w-full sm:w-auto"
                 >
                   Continue practicing

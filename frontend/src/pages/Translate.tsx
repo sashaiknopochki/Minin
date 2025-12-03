@@ -61,6 +61,7 @@ export default function Translate() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
 
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -398,13 +399,59 @@ export default function Translate() {
     }
   };
 
-  const handleQuizContinue = () => {
-    // Reset to show new quiz
+  const handleQuizContinue = async () => {
+    // Reset result and show loading
     setQuizResult(null);
-    // In real app, this would fetch a new quiz from backend
-    // For now, just close the dialog
-    setShowQuiz(false);
-    setQuizData(null);
+    setQuizLoading(true);
+
+    // Fetch next quiz (without phrase_id to get any eligible phrase)
+    try {
+      console.log('Fetching next quiz...');
+      const response = await fetch('/quiz/next');
+
+      console.log('Next quiz response status:', response.status);
+
+      // Log raw response text first to see what we're getting
+      const responseText = await response.text();
+      console.log('Next quiz response (first 200 chars):', responseText.substring(0, 200));
+
+      // Try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse next quiz response as JSON:', parseError);
+        // No more quizzes available, close dialog
+        setShowQuiz(false);
+        setQuizData(null);
+        return;
+      }
+
+      if (response.ok) {
+        const newQuizData: QuizData = {
+          quiz_attempt_id: data.quiz_attempt_id,
+          question: data.question,
+          options: data.options,
+          question_type: data.question_type,
+          phrase_id: data.phrase_id
+        };
+
+        setQuizData(newQuizData);
+        // Keep showQuiz true so dialog stays open
+      } else {
+        // No more quizzes available, close dialog
+        console.log('No more quizzes available:', data.error);
+        setShowQuiz(false);
+        setQuizData(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch next quiz:', error);
+      // Close dialog on error
+      setShowQuiz(false);
+      setQuizData(null);
+    } finally {
+      setQuizLoading(false);
+    }
   };
 
   return (
@@ -739,6 +786,7 @@ export default function Translate() {
           onSkip={handleQuizSkip}
           onContinue={handleQuizContinue}
           result={quizResult}
+          isLoading={quizLoading}
         />
       )}
     </div>
