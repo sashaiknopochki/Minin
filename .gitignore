@@ -222,3 +222,4 @@ migrations/versions/*.py
 *.swp
 *.swo
 *~
+logs/
