@@ -7,9 +7,24 @@ import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { X, Loader2, Copy, Check } from "lucide-react";
 import EtherealTorusFlow from "@/components/EtherealTorusFlow";
+import { QuizDialog } from "@/components/QuizDialog";
 
 interface TranslationResult {
   [language: string]: [string, string, string][];
+}
+
+interface QuizData {
+  quiz_attempt_id: number;
+  question: string;
+  options: string[];
+  question_type: string;
+  phrase_id: number;
+}
+
+interface QuizResult {
+  was_correct: boolean;
+  correct_answer: string;
+  user_answer: string;
 }
 
 export default function Translate() {
@@ -41,6 +56,11 @@ export default function Translate() {
 
   // Track copied state
   const [copiedField, setCopiedField] = useState<1 | 2 | 3 | null>(null);
+
+  // Quiz state
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizData, setQuizData] = useState<QuizData | null>(null);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
 
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -254,6 +274,38 @@ export default function Translate() {
     } catch (err) {
       console.error("Failed to copy text:", err);
     }
+  };
+
+  // Quiz handlers
+  const handleQuizSubmit = (answer: string) => {
+    if (!quizData) return;
+
+    // For now, using mock logic (backend API will provide the correct answer)
+    const isCorrect = answer === "cat"; // This will come from backend
+
+    const result: QuizResult = {
+      was_correct: isCorrect,
+      correct_answer: "cat", // This will come from backend
+      user_answer: answer,
+    };
+
+    setQuizResult(result);
+    console.log("Quiz result:", result);
+  };
+
+  const handleQuizSkip = () => {
+    setShowQuiz(false);
+    setQuizData(null);
+    setQuizResult(null);
+  };
+
+  const handleQuizContinue = () => {
+    // Reset to show new quiz
+    setQuizResult(null);
+    // In real app, this would fetch a new quiz from backend
+    // For now, just close the dialog
+    setShowQuiz(false);
+    setQuizData(null);
   };
 
   return (
@@ -527,6 +579,29 @@ export default function Translate() {
             </p>
           </div>
         )}
+
+        {/* Test Quiz Button - For testing only */}
+        {user && (
+          <div className="mt-6 flex justify-center">
+            <Button
+              onClick={() => {
+                const testQuiz: QuizData = {
+                  quiz_attempt_id: 1,
+                  question: "What is the English translation of 'Katze'?",
+                  options: ["cat", "dog", "house", "tree"],
+                  question_type: "multiple_choice_target",
+                  phrase_id: 123,
+                };
+                setQuizData(testQuiz);
+                setShowQuiz(true);
+                setQuizResult(null);
+              }}
+              variant="outline"
+            >
+              Test Quiz Dialog
+            </Button>
+          </div>
+        )}
       </main>
 
       {/* How it works section - Only for logged-out users */}
@@ -576,6 +651,19 @@ export default function Translate() {
           <h2 className="w-full text-[120px] md:text-[160px] lg:text-[480px] font-bold text-center">minin</h2>
           <p className="text-lg">Designed and Developed by<a href='http://linkedin.com/in/aleksandr.sudin'> Sasha — Hire me!</a></p>
         </section>
+      )}
+
+      {/* Quiz Dialog */}
+      {quizData && (
+        <QuizDialog
+          open={showQuiz}
+          onOpenChange={setShowQuiz}
+          quizData={quizData}
+          onSubmit={handleQuizSubmit}
+          onSkip={handleQuizSkip}
+          onContinue={handleQuizContinue}
+          result={quizResult}
+        />
       )}
     </div>
   );
