@@ -127,7 +127,10 @@ class AnswerEvaluationService:
             'multiple_choice_target',
             'multiple_choice_source',
             'text_input_target',
-            'text_input_source'
+            'text_input_source',
+            'contextual',
+            'definition',
+            'synonym'
         ]
         if quiz_attempt.question_type not in supported_types:
             raise ValueError(
@@ -168,7 +171,8 @@ class AnswerEvaluationService:
                 valid_answers=valid_answers,
                 question_type=quiz_attempt.question_type,
                 translations_dict=translations_dict,
-                phrase_text=phrase.text
+                phrase_text=phrase.text,
+                quiz_attempt=quiz_attempt  # Pass full quiz_attempt for context access
             )
 
         # Update quiz attempt
@@ -336,7 +340,8 @@ class AnswerEvaluationService:
         valid_answers: List[str],
         question_type: str,
         translations_dict: Dict[str, Any],
-        phrase_text: str
+        phrase_text: str,
+        quiz_attempt: 'QuizAttempt' = None
     ) -> bool:
         """
         Use multi-tier evaluation strategy for text input answers.
@@ -395,7 +400,12 @@ class AnswerEvaluationService:
 
             client = OpenAI(api_key=api_key)
 
-            # Build evaluation prompt
+            # Extract context sentence if this is a contextual question
+            context_sentence = None
+            if question_type == 'contextual' and quiz_attempt and quiz_attempt.prompt_json:
+                context_sentence = quiz_attempt.prompt_json.get('context_sentence', '')
+
+            # Build base evaluation prompt
             prompt = f"""Evaluate if the user's answer is correct for this language learning quiz.
 
 Question type: {question_type}
@@ -403,7 +413,19 @@ Phrase being quizzed: "{phrase_text}"
 Valid answers (any of these is correct): {json.dumps(valid_answers, ensure_ascii=False)}
 Full translation data: {json.dumps(translations_dict, ensure_ascii=False)}
 User's answer: "{user_answer}"
+"""
 
+            # Add context-specific instructions for contextual questions
+            if question_type == 'contextual' and context_sentence:
+                prompt += f"""
+**IMPORTANT - CONTEXTUAL QUESTION**:
+Context sentence: "{context_sentence}"
+The user's answer must match the meaning of '{phrase_text}' WITHIN THIS SPECIFIC CONTEXT.
+Do not accept answers that are valid translations but don't fit this particular context.
+"""
+
+            # Add general evaluation criteria
+            prompt += """
 Evaluation criteria:
 1. Accept with or without articles (cat = the cat = a cat)
 2. Accept any capitalization (cat = Cat = CAT)
@@ -413,11 +435,11 @@ Evaluation criteria:
 6. Reject if the answer is clearly a different word or concept
 
 Return ONLY valid JSON, no other text:
-{{
+{
   "is_correct": true or false,
   "explanation": "Brief explanation why correct or incorrect",
   "matched_answer": "Which valid answer it matched (or null if incorrect)"
-}}
+}
 """
 
             system_message = "You are a fair language learning quiz evaluator. Be lenient with minor errors but strict about meaning. Return only valid JSON."

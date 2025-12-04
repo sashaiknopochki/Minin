@@ -288,12 +288,40 @@ class QuestionGenerationService:
                 native_language=native_language
             )
 
+        elif question_type == 'contextual':
+            return QuestionGenerationService._generate_contextual(
+                client=client,
+                phrase_text=phrase_text,
+                phrase_language=phrase_language,
+                translations=translations,
+                native_language=native_language,
+                context_sentence=context_sentence
+            )
+
+        elif question_type == 'definition':
+            return QuestionGenerationService._generate_definition(
+                client=client,
+                phrase_text=phrase_text,
+                phrase_language=phrase_language,
+                translations=translations,
+                native_language=native_language
+            )
+
+        elif question_type == 'synonym':
+            return QuestionGenerationService._generate_synonym(
+                client=client,
+                phrase_text=phrase_text,
+                phrase_language=phrase_language,
+                translations=translations,
+                native_language=native_language
+            )
+
         else:
             # Unsupported question type
             raise ValueError(
                 f"Question type '{question_type}' not supported. "
                 f"Supported types: multiple_choice_target, multiple_choice_source, "
-                f"text_input_target, text_input_source"
+                f"text_input_target, text_input_source, contextual, definition, synonym"
             )
 
     @staticmethod
@@ -783,6 +811,382 @@ Return format:
             raise RuntimeError(f"Failed to generate question: {e}")
 
     @staticmethod
+    def _generate_contextual(
+        client: OpenAI,
+        phrase_text: str,
+        phrase_language: str,
+        translations: Dict[str, Any],
+        native_language: str,
+        context_sentence: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate contextual question: "In the sentence '{context}', what does '{phrase}' mean?"
+
+        This tests the user's ability to understand a word in context, which is crucial
+        for disambiguating words with multiple meanings.
+
+        Args:
+            client: OpenAI client instance
+            phrase_text: The word/phrase to quiz on (e.g., "Bank")
+            phrase_language: Language code of the phrase (e.g., "de")
+            translations: Dict of translations by language name
+            native_language: User's native language code (e.g., "en")
+            context_sentence: Sentence where the word was seen (e.g., "Ich sitze auf der Bank")
+
+        Returns:
+            dict: {
+                'prompt': {
+                    'question': str,
+                    'options': None,
+                    'question_language': str,
+                    'answer_language': str,
+                    'context_sentence': str
+                },
+                'correct_answer': str
+            }
+        """
+        # If no context available, fallback to text_input_target
+        if not context_sentence:
+            logger.warning(
+                f"No context_sentence available for contextual question on '{phrase_text}'. "
+                f"Falling back to text_input_target."
+            )
+            return QuestionGenerationService._generate_text_input_target(
+                client=client,
+                phrase_text=phrase_text,
+                phrase_language=phrase_language,
+                translations=translations,
+                native_language=native_language
+            )
+
+        # Get native language name
+        native_lang = Language.query.get(native_language)
+        native_lang_name = native_lang.en_name if native_lang else "English"
+
+        # Get source language name
+        source_lang = Language.query.get(phrase_language)
+        source_lang_name = source_lang.en_name if source_lang else phrase_language
+
+        prompt = f"""Generate a contextual translation question.
+
+Context sentence: "{context_sentence}"
+Word to test: "{phrase_text}"
+Source language: {source_lang_name}
+Target language (native): {native_lang_name}
+
+Available translations: {json.dumps(translations, ensure_ascii=False)}
+
+Requirements:
+1. Ask question in SOURCE language ({source_lang_name})
+2. User answers in their NATIVE language ({native_lang_name})
+3. Question format: "In the sentence '{context_sentence}', what does '{phrase_text}' mean?"
+4. The correct answer must match the context of the sentence
+5. If word has multiple meanings, only the contextually appropriate one is correct
+6. Include the full context sentence in the question
+7. Return ONLY valid JSON, no other text
+
+Return format:
+{{
+  "question": "In the sentence '{context_sentence}', what does '{phrase_text}' mean?",
+  "correct_answer": "contextually appropriate translation",
+  "contextual_meaning": "brief explanation of why this meaning fits the context",
+  "question_language": "{phrase_language}",
+  "answer_language": "{native_language}"
+}}
+"""
+
+        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+
+        # Call LLM with retry logic
+        try:
+            content = QuestionGenerationService._call_api_with_retry(
+                client=client,
+                prompt=prompt,
+                system_message=system_message
+            )
+
+            # Parse JSON response
+            result = json.loads(content)
+
+            # Validate response
+            if 'question' not in result or 'correct_answer' not in result:
+                logger.warning(f"LLM returned incomplete response for contextual: {result}")
+                raise ValueError("Incomplete LLM response")
+
+            logger.info(f"Generated contextual question for '{phrase_text}' with context")
+
+            # Return structured response
+            return {
+                'prompt': {
+                    'question': result['question'],
+                    'options': None,  # Text input
+                    'question_language': result.get('question_language', phrase_language),
+                    'answer_language': result.get('answer_language', native_language),
+                    'context_sentence': context_sentence  # Store for evaluation
+                },
+                'correct_answer': result['correct_answer']
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
+            logger.error(f"Response content: {content}")
+            raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
+
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API: {e}")
+            raise RuntimeError(f"Failed to generate question: {e}")
+
+    @staticmethod
+    def _generate_definition(
+        client: OpenAI,
+        phrase_text: str,
+        phrase_language: str,
+        translations: Dict[str, Any],
+        native_language: str
+    ) -> Dict[str, Any]:
+        """
+        Generate definition question: "Define '{phrase}'" or "What does '{phrase}' mean?"
+
+        CRITICAL: This is different from text_input questions - the user must explain
+        the word IN THE SOURCE LANGUAGE, not translate it. This tests deep understanding.
+
+        Args:
+            client: OpenAI client instance
+            phrase_text: The word/phrase to quiz on (e.g., "geben")
+            phrase_language: Language code of the phrase (e.g., "de")
+            translations: Dict of translations by language name
+            native_language: User's native language code (for reference)
+
+        Returns:
+            dict: {
+                'prompt': {
+                    'question': str,
+                    'options': None,
+                    'question_language': str (source language),
+                    'answer_language': str (source language)
+                },
+                'correct_answer': str or list (acceptable definitions in source language)
+            }
+        """
+        # Get source language name
+        source_lang = Language.query.get(phrase_language)
+        source_lang_name = source_lang.en_name if source_lang else phrase_language
+
+        prompt = f"""Generate a definition question.
+
+Word to test: "{phrase_text}"
+Source language: {source_lang_name}
+
+Available translations with definitions: {json.dumps(translations, ensure_ascii=False)}
+
+Requirements:
+1. Ask question in SOURCE language ({source_lang_name})
+2. Question format: "Definiere '{phrase_text}'" (German example) or "Explain what '{phrase_text}' means in {source_lang_name}"
+3. Extract the definition from translations_json to use as reference answer
+4. **CRITICAL**: The correct_answer should be a definition IN THE SOURCE LANGUAGE ({source_lang_name}), NOT a translation
+5. This tests deep understanding - user must explain the word in the language they're learning
+6. If multiple acceptable definitions exist, provide them as a list
+7. No options - text input only
+8. Return ONLY valid JSON, no other text
+
+Return format:
+{{
+  "question": "Definiere '{phrase_text}'" or "Explain what '{phrase_text}' means in {source_lang_name}",
+  "correct_answer": "definition in source language" or ["definition 1", "definition 2"],
+  "question_language": "{phrase_language}",
+  "answer_language": "{phrase_language}"
+}}
+
+Example (for German word "geben"):
+{{
+  "question": "Was bedeutet 'geben'?",
+  "correct_answer": ["etwas jemandem übergeben", "jemandem etwas schenken", "zur Verfügung stellen"],
+  "question_language": "de",
+  "answer_language": "de"
+}}
+"""
+
+        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+
+        # Call LLM with retry logic
+        try:
+            content = QuestionGenerationService._call_api_with_retry(
+                client=client,
+                prompt=prompt,
+                system_message=system_message
+            )
+
+            # Parse JSON response
+            result = json.loads(content)
+
+            # Validate response
+            if 'question' not in result or 'correct_answer' not in result:
+                logger.warning(f"LLM returned incomplete response for definition: {result}")
+                raise ValueError("Incomplete LLM response")
+
+            # Validate that answer_language is source language (not native language)
+            if result.get('answer_language') == native_language:
+                logger.warning(
+                    f"Definition question returned answer_language={native_language}, "
+                    f"correcting to source language {phrase_language}"
+                )
+                result['answer_language'] = phrase_language
+
+            logger.info(f"Generated definition question for '{phrase_text}'")
+
+            # Return structured response
+            return {
+                'prompt': {
+                    'question': result['question'],
+                    'options': None,  # Text input
+                    'question_language': result.get('question_language', phrase_language),
+                    'answer_language': result.get('answer_language', phrase_language)
+                },
+                'correct_answer': result['correct_answer']
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
+            logger.error(f"Response content: {content}")
+            raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
+
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API: {e}")
+            raise RuntimeError(f"Failed to generate question: {e}")
+
+    @staticmethod
+    def _generate_synonym(
+        client: OpenAI,
+        phrase_text: str,
+        phrase_language: str,
+        translations: Dict[str, Any],
+        native_language: str
+    ) -> Dict[str, Any]:
+        """
+        Generate synonym question: "Provide a synonym for '{phrase}'"
+
+        CRITICAL: User must provide a synonym IN THE SOURCE LANGUAGE, not a translation.
+        The use of the word "synonym" makes it clear we want a word in the same language.
+
+        Args:
+            client: OpenAI client instance
+            phrase_text: The word/phrase to quiz on (e.g., "schön")
+            phrase_language: Language code of the phrase (e.g., "de")
+            translations: Dict of translations by language name
+            native_language: User's native language code (for reference)
+
+        Returns:
+            dict: {
+                'prompt': {
+                    'question': str,
+                    'options': None,
+                    'question_language': str (source language),
+                    'answer_language': str (source language)
+                },
+                'correct_answer': list (acceptable synonyms in source language)
+            }
+        """
+        # Get source language name
+        source_lang = Language.query.get(phrase_language)
+        source_lang_name = source_lang.en_name if source_lang else phrase_language
+
+        prompt = f"""Generate a synonym question.
+
+Word to test: "{phrase_text}"
+Source language: {source_lang_name}
+
+Available translations with related words: {json.dumps(translations, ensure_ascii=False)}
+
+Requirements:
+1. Ask question in SOURCE language ({source_lang_name})
+2. Question format: "Provide a synonym for '{phrase_text}'" or "Nenne ein Synonym für '{phrase_text}'" (German example)
+3. Use the word "synonym" to make it clear we want a word in the SAME language, not a translation
+4. Extract related words/synonyms from translations_json
+5. **CRITICAL**: The correct_answer should be synonyms IN THE SOURCE LANGUAGE ({source_lang_name}), NOT translations
+6. Accept any valid synonym in the source language, not just the ones from translations_json
+7. Provide multiple acceptable synonyms as a list
+8. This tests vocabulary breadth within the target language
+9. No options - text input only
+10. Return ONLY valid JSON, no other text
+
+Return format:
+{{
+  "question": "Provide a synonym for '{phrase_text}'" or "Nenne ein Synonym für '{phrase_text}'",
+  "correct_answer": ["synonym1", "synonym2", "synonym3"],
+  "question_language": "{phrase_language}",
+  "answer_language": "{phrase_language}"
+}}
+
+Example (for German word "schön"):
+{{
+  "question": "Nenne ein Synonym für 'schön'",
+  "correct_answer": ["hübsch", "wunderschön", "herrlich", "attraktiv", "prächtig"],
+  "question_language": "de",
+  "answer_language": "de"
+}}
+"""
+
+        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+
+        # Call LLM with retry logic
+        try:
+            content = QuestionGenerationService._call_api_with_retry(
+                client=client,
+                prompt=prompt,
+                system_message=system_message
+            )
+
+            # Parse JSON response
+            result = json.loads(content)
+
+            # Validate response
+            if 'question' not in result or 'correct_answer' not in result:
+                logger.warning(f"LLM returned incomplete response for synonym: {result}")
+                raise ValueError("Incomplete LLM response")
+
+            # Validate that answer_language is source language (not native language)
+            if result.get('answer_language') == native_language:
+                logger.warning(
+                    f"Synonym question returned answer_language={native_language}, "
+                    f"correcting to source language {phrase_language}"
+                )
+                result['answer_language'] = phrase_language
+
+            logger.info(f"Generated synonym question for '{phrase_text}'")
+
+            # Return structured response
+            return {
+                'prompt': {
+                    'question': result['question'],
+                    'options': None,  # Text input
+                    'question_language': result.get('question_language', phrase_language),
+                    'answer_language': result.get('answer_language', phrase_language)
+                },
+                'correct_answer': result['correct_answer']
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
+            logger.error(f"Response content: {content}")
+            raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
+
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API: {e}")
+            raise RuntimeError(f"Failed to generate question: {e}")
+
+    @staticmethod
     def _generate_fallback_question(
         question_type: str,
         phrase_text: str,
@@ -892,6 +1296,45 @@ Return format:
                         'answer_language': phrase_language
                     },
                     'correct_answer': phrase_text
+                }
+
+            elif question_type == 'contextual':
+                # Fallback for contextual: simple translation question
+                # Note: context_sentence not available in fallback scenario
+                return {
+                    'prompt': {
+                        'question': f"What does '{phrase_text}' mean in this context?",
+                        'options': None,
+                        'question_language': native_language,
+                        'answer_language': native_language,
+                        'context_sentence': ''  # No context available
+                    },
+                    'correct_answer': correct_answer
+                }
+
+            elif question_type == 'definition':
+                # Fallback for definition: ask for definition in source language
+                # Extract first available definition from translations if possible
+                return {
+                    'prompt': {
+                        'question': f"Define '{phrase_text}' in {source_lang_name}",
+                        'options': None,
+                        'question_language': phrase_language,
+                        'answer_language': phrase_language
+                    },
+                    'correct_answer': f"[definition of {phrase_text} in {source_lang_name}]"
+                }
+
+            elif question_type == 'synonym':
+                # Fallback for synonym: ask for synonym in source language
+                return {
+                    'prompt': {
+                        'question': f"Provide a synonym for '{phrase_text}' in {source_lang_name}",
+                        'options': None,
+                        'question_language': phrase_language,
+                        'answer_language': phrase_language
+                    },
+                    'correct_answer': [f"[synonym of {phrase_text}]"]
                 }
 
             else:
