@@ -16,9 +16,18 @@ from datetime import datetime
 from models import db
 from models.quiz_attempt import QuizAttempt
 from models.user_learning_progress import UserLearningProgress
+from models.phrase import Phrase
+from models.phrase_translation import PhraseTranslation
+from models.language import Language
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# OpenAI model for answer evaluation
+DEFAULT_MODEL = "gpt-4o-mini"  # Cost-effective model for evaluation
 
 
 class AnswerEvaluationService:
@@ -113,11 +122,16 @@ class AnswerEvaluationService:
             logger.warning(f"Quiz attempt {quiz_attempt_id} has malformed prompt_json (missing 'question' field)")
             # Don't fail, but log for monitoring
 
-        # Validate question type (MVP: multiple choice only)
-        supported_types = ['multiple_choice_target', 'multiple_choice_source']
+        # Validate question type
+        supported_types = [
+            'multiple_choice_target',
+            'multiple_choice_source',
+            'text_input_target',
+            'text_input_source'
+        ]
         if quiz_attempt.question_type not in supported_types:
             raise ValueError(
-                f"Question type '{quiz_attempt.question_type}' not supported in MVP. "
+                f"Question type '{quiz_attempt.question_type}' not supported. "
                 f"Supported types: {', '.join(supported_types)}"
             )
 
@@ -126,11 +140,36 @@ class AnswerEvaluationService:
             quiz_attempt.correct_answer
         )
 
-        # Evaluate answer
-        was_correct = AnswerEvaluationService._evaluate_multiple_choice(
-            user_answer=user_answer,
-            valid_answers=valid_answers
-        )
+        # Evaluate answer based on question type
+        if quiz_attempt.question_type in ['multiple_choice_target', 'multiple_choice_source']:
+            # Simple exact match for multiple choice
+            was_correct = AnswerEvaluationService._evaluate_multiple_choice(
+                user_answer=user_answer,
+                valid_answers=valid_answers
+            )
+        else:
+            # Text input: use flexible evaluation with LLM
+            # Get translations_json for context
+            phrase = Phrase.query.get(quiz_attempt.phrase_id)
+            translations = PhraseTranslation.query.filter_by(phrase_id=phrase.id).all()
+
+            # Build translations dict for LLM context
+            translations_dict = {}
+            for trans in translations:
+                try:
+                    lang = Language.query.get(trans.target_language_code)
+                    if lang and trans.translations_json:
+                        translations_dict[lang.en_name] = trans.translations_json
+                except Exception as e:
+                    logger.warning(f"Failed to process translation {trans.id}: {str(e)}")
+
+            was_correct = AnswerEvaluationService._evaluate_with_llm(
+                user_answer=user_answer,
+                valid_answers=valid_answers,
+                question_type=quiz_attempt.question_type,
+                translations_dict=translations_dict,
+                phrase_text=phrase.text
+            )
 
         # Update quiz attempt
         try:
@@ -290,6 +329,132 @@ class AnswerEvaluationService:
 
         # Check if user answer matches any valid answer
         return normalized_user_answer in valid_answers
+
+    @staticmethod
+    def _evaluate_with_llm(
+        user_answer: str,
+        valid_answers: List[str],
+        question_type: str,
+        translations_dict: Dict[str, Any],
+        phrase_text: str
+    ) -> bool:
+        """
+        Use multi-tier evaluation strategy for text input answers.
+
+        Evaluation tiers (in order):
+        1. Exact match (fast path, no LLM call)
+        2. Article-insensitive match ("cat" == "the cat")
+        3. LLM-based flexible evaluation (typos, synonyms, capitalization)
+        4. Fallback to strict matching if LLM fails
+
+        Args:
+            user_answer: User's submitted answer
+            valid_answers: List of acceptable answers
+            question_type: Type of question being evaluated
+            translations_dict: Full translations_json for context
+            phrase_text: Original phrase being quizzed
+
+        Returns:
+            bool: True if answer is correct, False otherwise
+        """
+        # Normalize user answer
+        user_normalized = user_answer.strip().lower()
+
+        # Tier 1: Exact match (fast path)
+        for valid in valid_answers:
+            if user_normalized == valid.strip().lower():
+                logger.info(f"Answer '{user_answer}' matched exactly: {valid}")
+                return True
+
+        # Tier 2: Article-insensitive match
+        # Remove common articles: a, an, the
+        user_no_article = user_normalized
+        for article in ['the ', 'a ', 'an ']:
+            if user_no_article.startswith(article):
+                user_no_article = user_no_article[len(article):]
+                break
+
+        for valid in valid_answers:
+            valid_no_article = valid.strip().lower()
+            for article in ['the ', 'a ', 'an ']:
+                if valid_no_article.startswith(article):
+                    valid_no_article = valid_no_article[len(article):]
+                    break
+
+            if user_no_article == valid_no_article:
+                logger.info(f"Answer '{user_answer}' matched without article: {valid}")
+                return True
+
+        # Tier 3: LLM-based flexible evaluation
+        try:
+            load_dotenv()
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                logger.warning("OPENAI_API_KEY not found, skipping LLM evaluation")
+                return False
+
+            client = OpenAI(api_key=api_key)
+
+            # Build evaluation prompt
+            prompt = f"""Evaluate if the user's answer is correct for this language learning quiz.
+
+Question type: {question_type}
+Phrase being quizzed: "{phrase_text}"
+Valid answers (any of these is correct): {json.dumps(valid_answers, ensure_ascii=False)}
+Full translation data: {json.dumps(translations_dict, ensure_ascii=False)}
+User's answer: "{user_answer}"
+
+Evaluation criteria:
+1. Accept with or without articles (cat = the cat = a cat)
+2. Accept any capitalization (cat = Cat = CAT)
+3. Accept minor typos (1-2 character mistakes, e.g., "caat" for "cat")
+4. Accept any synonym that appears in the translation data
+5. Accept any valid meaning from the translations_json
+6. Reject if the answer is clearly a different word or concept
+
+Return ONLY valid JSON, no other text:
+{{
+  "is_correct": true or false,
+  "explanation": "Brief explanation why correct or incorrect",
+  "matched_answer": "Which valid answer it matched (or null if incorrect)"
+}}
+"""
+
+            system_message = "You are a fair language learning quiz evaluator. Be lenient with minor errors but strict about meaning. Return only valid JSON."
+
+            response = client.chat.completions.create(
+                model=DEFAULT_MODEL,
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,  # Lower temperature for consistency
+                max_tokens=200,
+                timeout=10.0
+            )
+
+            result_text = response.choices[0].message.content.strip()
+            result = json.loads(result_text)
+
+            is_correct = result.get('is_correct', False)
+            explanation = result.get('explanation', 'No explanation provided')
+
+            logger.info(
+                f"LLM evaluation: user_answer='{user_answer}', "
+                f"is_correct={is_correct}, explanation='{explanation}'"
+            )
+
+            return is_correct
+
+        except json.JSONDecodeError as e:
+            logger.error(f"LLM returned invalid JSON: {str(e)}")
+            return False
+
+        except Exception as e:
+            logger.error(f"LLM evaluation failed: {str(e)}")
+            # Tier 4: Fallback to strict matching
+            logger.info("Falling back to strict matching")
+            return False
 
     @staticmethod
     def _update_learning_progress(

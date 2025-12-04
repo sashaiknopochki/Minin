@@ -270,11 +270,30 @@ class QuestionGenerationService:
                 native_language=native_language
             )
 
+        elif question_type == 'text_input_target':
+            return QuestionGenerationService._generate_text_input_target(
+                client=client,
+                phrase_text=phrase_text,
+                phrase_language=phrase_language,
+                translations=translations,
+                native_language=native_language
+            )
+
+        elif question_type == 'text_input_source':
+            return QuestionGenerationService._generate_text_input_source(
+                client=client,
+                phrase_text=phrase_text,
+                phrase_language=phrase_language,
+                translations=translations,
+                native_language=native_language
+            )
+
         else:
-            # For MVP, only multiple choice is supported
+            # Unsupported question type
             raise ValueError(
-                f"Question type '{question_type}' not supported in MVP. "
-                f"Supported types: multiple_choice_target, multiple_choice_source"
+                f"Question type '{question_type}' not supported. "
+                f"Supported types: multiple_choice_target, multiple_choice_source, "
+                f"text_input_target, text_input_source"
             )
 
     @staticmethod
@@ -506,6 +525,264 @@ Return format:
             raise RuntimeError(f"Failed to generate question: {e}")
 
     @staticmethod
+    def _generate_text_input_target(
+        client: OpenAI,
+        phrase_text: str,
+        phrase_language: str,
+        translations: Dict[str, Any],
+        native_language: str
+    ) -> Dict[str, Any]:
+        """
+        Generate text input question: "Type the [native language] translation of '[phrase]'"
+
+        User sees phrase in source language and types translation in their native language.
+
+        Args:
+            client: OpenAI client instance
+            phrase_text: The word/phrase to quiz on (e.g., "Katze")
+            phrase_language: Language code of the phrase (e.g., "de")
+            translations: Dict of translations by language name
+            native_language: User's native language code (e.g., "en")
+
+        Returns:
+            dict: {
+                'prompt': {
+                    'question': str,
+                    'options': None,  # No options for text input
+                    'question_language': str,
+                    'answer_language': str
+                },
+                'correct_answer': str or list
+            }
+        """
+        # Get native language name for the prompt
+        native_lang = Language.query.get(native_language)
+        native_lang_name = native_lang.en_name if native_lang else "English"
+
+        # Get source language name
+        source_lang = Language.query.get(phrase_language)
+        source_lang_name = source_lang.en_name if source_lang else phrase_language
+
+        prompt = f"""Generate a text input question to test translation recall (production).
+
+Source phrase: "{phrase_text}"
+Source language: {source_lang_name}
+Target language (native): {native_lang_name}
+
+Available translations: {json.dumps(translations, ensure_ascii=False)}
+
+Requirements:
+1. Question: "Type the {native_lang_name} translation of '{phrase_text}'"
+2. No multiple choice options - user types the answer
+3. If the word has multiple valid meanings, list ALL in correct_answer as an array
+4. Return ONLY valid JSON, no other text
+
+Return format:
+{{
+  "question": "Type the {native_lang_name} translation of '{phrase_text}'",
+  "options": null,
+  "correct_answer": "cat",
+  "question_language": "{native_language}",
+  "answer_language": "{native_language}"
+}}
+
+If multiple meanings exist, use this format:
+{{
+  "question": "Type the {native_lang_name} translation of '{phrase_text}'",
+  "options": null,
+  "correct_answer": ["cat", "feline"],
+  "question_language": "{native_language}",
+  "answer_language": "{native_language}"
+}}
+"""
+
+        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+
+        # Call LLM with retry logic
+        try:
+            content = QuestionGenerationService._call_api_with_retry(
+                client=client,
+                prompt=prompt,
+                system_message=system_message
+            )
+
+            # Parse JSON response
+            result = json.loads(content)
+
+            # Validate response has required fields
+            if 'question' not in result or 'correct_answer' not in result:
+                logger.warning(f"LLM returned incomplete response for text_input_target: {result}")
+                raise ValueError("Incomplete LLM response")
+
+            # Force options to null for text input
+            result['options'] = None
+
+            logger.info(f"Generated text_input_target question for '{phrase_text}'")
+
+            # Return structured response
+            return {
+                'prompt': {
+                    'question': result['question'],
+                    'options': None,
+                    'question_language': result.get('question_language', native_language),
+                    'answer_language': result.get('answer_language', native_language)
+                },
+                'correct_answer': result['correct_answer']
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
+            logger.error(f"Response content: {content}")
+            raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
+
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API: {e}")
+            raise RuntimeError(f"Failed to generate question: {e}")
+
+    @staticmethod
+    def _generate_text_input_source(
+        client: OpenAI,
+        phrase_text: str,
+        phrase_language: str,
+        translations: Dict[str, Any],
+        native_language: str
+    ) -> Dict[str, Any]:
+        """
+        Generate text input question: "Type the [source language] translation of '[native phrase]'"
+
+        User sees phrase in native language and types translation in source language.
+        This is more challenging as user must produce the foreign language word.
+
+        Args:
+            client: OpenAI client instance
+            phrase_text: The word/phrase in source language (e.g., "Katze")
+            phrase_language: Language code of the phrase (e.g., "de")
+            translations: Dict of translations by language name
+            native_language: User's native language code (e.g., "en")
+
+        Returns:
+            dict: {
+                'prompt': {
+                    'question': str,
+                    'options': None,
+                    'question_language': str,
+                    'answer_language': str
+                },
+                'correct_answer': str
+            }
+        """
+        # Get native language name
+        native_lang = Language.query.get(native_language)
+        native_lang_name = native_lang.en_name if native_lang else "English"
+
+        # Get source language name
+        source_lang = Language.query.get(phrase_language)
+        source_lang_name = source_lang.en_name if source_lang else phrase_language
+
+        # Extract a native translation to show in question
+        native_translation = None
+        for lang_name, trans_data in translations.items():
+            if isinstance(trans_data, dict):
+                # Try different structures
+                for key in trans_data:
+                    if isinstance(trans_data[key], list) and trans_data[key]:
+                        if isinstance(trans_data[key][0], list) and trans_data[key][0]:
+                            native_translation = trans_data[key][0][0]
+                            break
+                        elif isinstance(trans_data[key][0], str):
+                            native_translation = trans_data[key][0]
+                            break
+                if native_translation:
+                    break
+            elif isinstance(trans_data, list) and len(trans_data) > 0:
+                if isinstance(trans_data[0], list) and len(trans_data[0]) > 0:
+                    native_translation = trans_data[0][0]
+                    break
+                elif isinstance(trans_data[0], str):
+                    native_translation = trans_data[0]
+                    break
+
+        if not native_translation:
+            logger.warning(f"No native translation found for {phrase_text}, using phrase itself")
+            native_translation = phrase_text
+
+        prompt = f"""Generate a reverse text input question to test production in the target language.
+
+Native word: "{native_translation}"
+Native language: {native_lang_name}
+Target language (to type): {source_lang_name}
+Correct answer in {source_lang_name}: "{phrase_text}"
+
+Available translations: {json.dumps(translations, ensure_ascii=False)}
+
+Requirements:
+1. Question: "Type the {source_lang_name} word for '{native_translation}'"
+2. No multiple choice options - user types the answer
+3. The correct answer is the original phrase: "{phrase_text}"
+4. Return ONLY valid JSON, no other text
+
+Return format:
+{{
+  "question": "Type the {source_lang_name} word for '{native_translation}'",
+  "options": null,
+  "correct_answer": "{phrase_text}",
+  "question_language": "{native_language}",
+  "answer_language": "{phrase_language}"
+}}
+"""
+
+        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+
+        # Call LLM with retry logic
+        try:
+            content = QuestionGenerationService._call_api_with_retry(
+                client=client,
+                prompt=prompt,
+                system_message=system_message
+            )
+
+            # Parse JSON response
+            result = json.loads(content)
+
+            # Validate response
+            if 'question' not in result or 'correct_answer' not in result:
+                logger.warning(f"LLM returned incomplete response for text_input_source: {result}")
+                raise ValueError("Incomplete LLM response")
+
+            # Force options to null
+            result['options'] = None
+
+            logger.info(f"Generated text_input_source question for '{phrase_text}'")
+
+            # Return structured response
+            return {
+                'prompt': {
+                    'question': result['question'],
+                    'options': None,
+                    'question_language': result.get('question_language', native_language),
+                    'answer_language': result.get('answer_language', phrase_language)
+                },
+                'correct_answer': result['correct_answer']
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
+            logger.error(f"Response content: {content}")
+            raise RuntimeError(f"LLM returned invalid JSON: {e}")
+
+        except ValueError as e:
+            logger.error(f"LLM response validation failed: {e}")
+            raise RuntimeError(f"Invalid LLM response: {e}")
+
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API: {e}")
+            raise RuntimeError(f"Failed to generate question: {e}")
+
+    @staticmethod
     def _generate_fallback_question(
         question_type: str,
         phrase_text: str,
@@ -587,6 +864,30 @@ Return format:
                             "[option 3]",
                             "[option 4]"
                         ],
+                        'question_language': native_language,
+                        'answer_language': phrase_language
+                    },
+                    'correct_answer': phrase_text
+                }
+
+            elif question_type == 'text_input_target':
+                # Simple text input: "Type the English translation of 'Katze'"
+                return {
+                    'prompt': {
+                        'question': f"Type the {native_lang_name} translation of '{phrase_text}'",
+                        'options': None,
+                        'question_language': native_language,
+                        'answer_language': native_language
+                    },
+                    'correct_answer': correct_answer
+                }
+
+            elif question_type == 'text_input_source':
+                # Reverse text input: "Type the German word for 'cat'"
+                return {
+                    'prompt': {
+                        'question': f"Type the {source_lang_name} word for '{correct_answer}'",
+                        'options': None,
                         'question_language': native_language,
                         'answer_language': phrase_language
                     },

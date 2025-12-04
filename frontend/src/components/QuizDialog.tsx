@@ -8,12 +8,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Check, X, Loader2 } from "lucide-react"
 
 export interface QuizData {
   quiz_attempt_id: number
   question: string
-  options: string[]
+  options: string[] | null  // null for text input questions
   question_type: string
   phrase_id: number
 }
@@ -45,9 +46,28 @@ export function QuizDialog({
   result,
   isLoading = false,
 }: QuizDialogProps) {
+  const [textAnswer, setTextAnswer] = React.useState("")
+
+  // Reset text answer when quiz changes
+  React.useEffect(() => {
+    setTextAnswer("")
+  }, [quizData.quiz_attempt_id])
+
   const handleAnswerClick = (answer: string) => {
     if (!result) {
       onSubmit(answer)
+    }
+  }
+
+  const handleTextSubmit = () => {
+    if (!result && textAnswer.trim()) {
+      onSubmit(textAnswer.trim())
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !result && textAnswer.trim()) {
+      handleTextSubmit()
     }
   }
 
@@ -147,24 +167,79 @@ export function QuizDialog({
               {quizData.question}
             </h3>
 
-            <div className="flex flex-col gap-3">
-              {quizData.options.map((option, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  onClick={() => handleAnswerClick(option)}
+            {quizData.options === null ? (
+              // Text input question
+              <div className="space-y-4">
+                <Input
+                  type="text"
+                  placeholder="Type your answer..."
+                  value={textAnswer}
+                  onChange={(e) => setTextAnswer(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   disabled={!!result}
-                  className={getButtonClassName(option)}
-                >
-                  <span className={getButtonTextClassName(option)}>
-                    {option}
-                  </span>
-                  {getButtonIcon(option)}
-                </Button>
-              ))}
-            </div>
+                  className="text-lg py-6"
+                  autoFocus
+                />
 
-            {getFeedbackMessage()}
+                {!result && (
+                  <Button
+                    onClick={handleTextSubmit}
+                    disabled={!textAnswer.trim()}
+                    className="w-full py-6 text-lg"
+                  >
+                    Submit Answer
+                  </Button>
+                )}
+
+                {result && (
+                  <div className={`p-4 rounded-lg ${result.was_correct ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {result.was_correct ? (
+                        <>
+                          <Check className="h-5 w-5 text-green-600" />
+                          <span className="font-semibold text-green-900">Correct!</span>
+                        </>
+                      ) : (
+                        <>
+                          <X className="h-5 w-5 text-red-600" />
+                          <span className="font-semibold text-red-900">Incorrect</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-sm">
+                      Your answer: <strong className={result.was_correct ? '' : 'line-through'}>{result.user_answer}</strong>
+                    </p>
+                    {!result.was_correct && (
+                      <p className="text-sm mt-1">
+                        Correct answer: <strong>{result.correct_answer}</strong>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Multiple choice question
+              <>
+                <div className="flex flex-col gap-3">
+                  {quizData.options.map((option, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      onClick={() => handleAnswerClick(option)}
+                      disabled={!!result}
+                      className={getButtonClassName(option)}
+                    >
+                      <span className={getButtonTextClassName(option)}>
+                        {option}
+                      </span>
+                      {getButtonIcon(option)}
+                    </Button>
+                  ))}
+                </div>
+
+                {getFeedbackMessage()}
+              </>
+            )}
           </div>
         )}
 
