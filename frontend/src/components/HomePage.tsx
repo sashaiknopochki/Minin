@@ -61,7 +61,7 @@ export default function HomePage() {
   const [copiedField, setCopiedField] = useState<1 | 2 | 3 | null>(null);
 
   // Track active navigation page
-  const [activePage, setActivePage] = useState<'translate' | 'learn' | 'history'>('translate');
+  const [activePage, setActivePage] = useState<'translate' | 'history'>('translate');
 
   // Track mobile menu state
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -308,108 +308,88 @@ export default function HomePage() {
       {/* Header */}
       <header className="w-full py-3">
         <div className="flex items-center justify-between">
-          {/* Mobile Menu Button (left side, visible only on mobile) */}
-          <div className="md:hidden">
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 [&_svg]:size-6">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-64 h-full">
-                <SheetHeader>
-                  <SheetTitle>minin</SheetTitle>
-                </SheetHeader>
-                <nav className="flex flex-col gap-4 mt-8">
-                  <button
-                    onClick={() => {
-                      setActivePage('translate');
-                      setMobileMenuOpen(false);
-                    }}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      activePage === 'translate' && "font-bold"
-                    )}
-                  >
-                    Translate
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActivePage('learn');
-                      setMobileMenuOpen(false);
-                    }}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      activePage === 'learn' && "font-bold"
-                    )}
-                  >
-                    Learn
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActivePage('history');
-                      setMobileMenuOpen(false);
-                    }}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      activePage === 'history' && "font-bold"
-                    )}
-                  >
-                    History
-                  </button>
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
+          {/* Mobile Menu Button (left side, visible only on mobile) - Only for logged in users */}
+          {user && (
+            <div className="md:hidden">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 [&_svg]:size-6">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 h-full">
+                  <SheetHeader>
+                    <SheetTitle>minin</SheetTitle>
+                  </SheetHeader>
+                  <nav className="flex flex-col gap-4 mt-8">
+                    <button
+                      onClick={() => {
+                        setActivePage('translate');
+                        setMobileMenuOpen(false);
+                      }}
+                      className={cn(
+                        "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                        activePage === 'translate' && "font-bold"
+                      )}
+                    >
+                      Translate
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActivePage('history');
+                        setMobileMenuOpen(false);
+                      }}
+                      className={cn(
+                        "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                        activePage === 'history' && "font-bold"
+                      )}
+                    >
+                      History
+                    </button>
+                  </nav>
+                </SheetContent>
+              </Sheet>
+            </div>
+          )}
 
           {/* Logo (centered between menu and auth) */}
           <div className="flex-1 md:flex-none flex justify-center md:justify-start">
             <h1 className="text-4xl font-bold text-foreground">minin</h1>
           </div>
 
-          {/* Desktop Navigation (hidden on mobile, visible on desktop) */}
-          <div className="hidden md:flex items-baseline gap-4 lg:gap-6 flex-1 justify-center">
-            <NavigationMenu>
-              <NavigationMenuList className="gap-1">
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    onClick={() => setActivePage('translate')}
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      activePage === 'translate' && "font-bold"
-                    )}
-                  >
-                    Translate
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    onClick={() => setActivePage('learn')}
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      activePage === 'learn' && "font-bold"
-                    )}
-                  >
-                    Learn
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    onClick={() => setActivePage('history')}
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      activePage === 'history' && "font-bold"
-                    )}
-                  >
-                    History
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
+          {/* Desktop Navigation (hidden on mobile, visible on desktop) - Only for logged in users */}
+          {user && (
+            <div className="hidden md:flex items-baseline gap-4 lg:gap-6 flex-1 justify-center">
+              <NavigationMenu>
+                <NavigationMenuList className="gap-1">
+                  <NavigationMenuItem>
+                    <NavigationMenuLink
+                      onClick={() => setActivePage('translate')}
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "cursor-pointer bg-transparent",
+                        activePage === 'translate' && "font-bold"
+                      )}
+                    >
+                      Translate
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                  <NavigationMenuItem>
+                    <NavigationMenuLink
+                      onClick={() => setActivePage('history')}
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "cursor-pointer bg-transparent",
+                        activePage === 'history' && "font-bold"
+                      )}
+                    >
+                      History
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                </NavigationMenuList>
+              </NavigationMenu>
+            </div>
+          )}
 
           {/* Authentication - Show either Sign In or User Menu */}
           {user ? (
@@ -455,15 +435,6 @@ with AI-powered quizzes increasing active vocabulary.</p>
       <main className="w-full pt-12 relative z-10">
         {activePage === 'history' ? (
           <History />
-        ) : activePage === 'learn' ? (
-          <div className="w-full py-8">
-            <h1 className="text-4xl font-bold mb-8">Learn</h1>
-            <div className="flex flex-col items-center justify-center py-16 px-4">
-              <p className="text-lg text-muted-foreground text-center">
-                Quiz feature coming soon! Practice vocabulary from your search history.
-              </p>
-            </div>
-          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* First Input */}

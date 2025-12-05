@@ -32,126 +32,111 @@ export default function Layout() {
       {/* Header */}
       <header className="w-full py-3">
         <div className="flex items-center justify-between">
-          {/* Mobile Menu Button (left side, visible only on mobile) */}
-          <div className="md:hidden">
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 [&_svg]:size-6">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-64 h-full">
-                <SheetHeader>
-                  <SheetTitle>minin</SheetTitle>
-                </SheetHeader>
-                <nav className="flex flex-col gap-4 mt-8">
-                  <Link
-                    to="/translate"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      isActive('/translate') && "font-bold"
-                    )}
-                  >
-                    Translate
-                  </Link>
-                  <Link
-                    to="/learn"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      isActive('/learn') && "font-bold"
-                    )}
-                  >
-                    Learn
-                  </Link>
-                  <Link
-                    to="/practice"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      isActive('/practice') && "font-bold"
-                    )}
-                  >
-                    Practice
-                  </Link>
-                  <Link
-                    to="/history"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
-                      isActive('/history') && "font-bold"
-                    )}
-                  >
-                    History
-                  </Link>
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
+          {/* Mobile Menu Button (left side, visible only on mobile and for logged-in users) */}
+          {user && (
+            <div className="md:hidden">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 [&_svg]:size-6">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 h-full">
+                  <SheetHeader>
+                    <SheetTitle>minin</SheetTitle>
+                  </SheetHeader>
+                  <nav className="flex flex-col gap-4 mt-8">
+                    <Link
+                      to="/translate"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                        isActive('/translate') && "font-bold"
+                      )}
+                    >
+                      Translate
+                    </Link>
+                    <Link
+                      to="/practice"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                        isActive('/practice') && "font-bold"
+                      )}
+                    >
+                      Practice
+                    </Link>
+                    <Link
+                      to="/history"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={cn(
+                        "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                        isActive('/history') && "font-bold"
+                      )}
+                    >
+                      History
+                    </Link>
+                  </nav>
+                </SheetContent>
+              </Sheet>
+            </div>
+          )}
 
-          {/* Logo (centered between menu and auth) */}
-          <div className="flex-1 md:flex-none flex justify-center md:justify-start">
+          {/* Logo (centered between menu and auth for logged-in users, left-aligned for logged-out users) */}
+          <div className={cn(
+            "flex-1 md:flex-none flex md:justify-start",
+            user ? "justify-center" : "justify-start"
+          )}>
             <Link to="/translate">
               <h1 className="text-4xl font-bold text-foreground">minin</h1>
             </Link>
           </div>
 
-          {/* Desktop Navigation (hidden on mobile, visible on desktop) */}
-          <div className="hidden md:flex items-baseline gap-4 lg:gap-6 flex-1 justify-center">
-            <NavigationMenu>
-              <NavigationMenuList className="gap-1">
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    asChild
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      isActive('/translate') && "font-bold"
-                    )}
-                  >
-                    <Link to="/translate">Translate</Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    asChild
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      isActive('/learn') && "font-bold"
-                    )}
-                  >
-                    <Link to="/learn">Learn</Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    asChild
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      isActive('/practice') && "font-bold"
-                    )}
-                  >
-                    <Link to="/practice">Practice</Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink
-                    asChild
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      "cursor-pointer bg-transparent",
-                      isActive('/history') && "font-bold"
-                    )}
-                  >
-                    <Link to="/history">History</Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
+          {/* Desktop Navigation (hidden on mobile, visible on desktop, only for logged-in users) */}
+          {user && (
+            <div className="hidden md:flex items-baseline gap-4 lg:gap-6 flex-1 justify-center">
+              <NavigationMenu>
+                <NavigationMenuList className="gap-1">
+                  <NavigationMenuItem>
+                    <NavigationMenuLink
+                      asChild
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "cursor-pointer bg-transparent",
+                        isActive('/translate') && "font-bold"
+                      )}
+                    >
+                      <Link to="/translate">Translate</Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                  <NavigationMenuItem>
+                    <NavigationMenuLink
+                      asChild
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "cursor-pointer bg-transparent",
+                        isActive('/practice') && "font-bold"
+                      )}
+                    >
+                      <Link to="/practice">Practice</Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                  <NavigationMenuItem>
+                    <NavigationMenuLink
+                      asChild
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "cursor-pointer bg-transparent",
+                        isActive('/history') && "font-bold"
+                      )}
+                    >
+                      <Link to="/history">History</Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                </NavigationMenuList>
+              </NavigationMenu>
+            </div>
+          )}
 
           {/* Authentication - Show either Sign In or User Menu */}
           {user ? (
