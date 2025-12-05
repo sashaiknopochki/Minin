@@ -192,25 +192,25 @@ export function QuizDialog({
                 )}
 
                 {result && (
-                  <div className={`p-4 rounded-lg ${result.was_correct ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className="p-4 rounded-lg bg-muted border border-border">
                     <div className="flex items-center gap-2 mb-2">
                       {result.was_correct ? (
                         <>
-                          <Check className="h-5 w-5 text-green-600" />
-                          <span className="font-semibold text-green-900">Correct!</span>
+                          <Check className="h-5 w-5 text-foreground" />
+                          <span className="font-semibold text-foreground">Correct!</span>
                         </>
                       ) : (
                         <>
-                          <X className="h-5 w-5 text-red-600" />
-                          <span className="font-semibold text-red-900">Incorrect</span>
+                          <X className="h-5 w-5 text-foreground" />
+                          <span className="font-semibold text-foreground">Incorrect</span>
                         </>
                       )}
                     </div>
-                    <p className="text-sm">
+                    <p className="text-sm text-foreground">
                       Your answer: <strong className={result.was_correct ? '' : 'line-through'}>{result.user_answer}</strong>
                     </p>
                     {!result.was_correct && (
-                      <p className="text-sm mt-1">
+                      <p className="text-sm text-foreground mt-1">
                         Correct answer: <strong>{result.correct_answer}</strong>
                       </p>
                     )}

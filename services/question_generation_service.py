@@ -371,17 +371,19 @@ Target language (native): {native_lang_name}
 Available translations: {json.dumps(translations, ensure_ascii=False)}
 
 Requirements:
-1. Question: "What is the {native_lang_name} translation of '{phrase_text}'?"
-2. Generate 4 options: 1 correct + 3 distractors
-3. If the word has multiple meanings, list ALL valid translations in correct_answer as an array
-4. Distractors should be plausible words in {native_lang_name} but clearly wrong for this phrase
-5. Distractors should be at similar difficulty level (don't use obvious unrelated words)
-6. The order of options in your response doesn't matter - they will be randomized
-7. Return ONLY valid JSON, no other text
+1. Question: "What is the {native_lang_name} translation of \"{phrase_text}\"?"
+2. IMPORTANT: Use double quotes around the phrase, not single quotes
+3. IMPORTANT: End the question with a question mark (for multiple choice questions)
+4. Generate 4 options: 1 correct + 3 distractors
+5. If the word has multiple meanings, list ALL valid translations in correct_answer as an array
+6. Distractors should be plausible words in {native_lang_name} but clearly wrong for this phrase
+7. Distractors should be at similar difficulty level (don't use obvious unrelated words)
+8. The order of options in your response doesn't matter - they will be randomized
+9. Return ONLY valid JSON, no other text
 
 Return format:
 {{
-  "question": "What is the {native_lang_name} translation of '{phrase_text}'?",
+  "question": "What is the {native_lang_name} translation of \"{phrase_text}\"?",
   "options": ["correct_translation", "distractor1", "distractor2", "distractor3"],
   "correct_answer": "correct_translation",
   "question_language": "{native_language}",
@@ -390,7 +392,7 @@ Return format:
 
 If multiple meanings exist, use this format:
 {{
-  "question": "What is the {native_lang_name} translation of '{phrase_text}'?",
+  "question": "What is the {native_lang_name} translation of \"{phrase_text}\"?",
   "options": ["cat", "feline", "dog", "house"],
   "correct_answer": ["cat", "feline"],
   "question_language": "{native_language}",
@@ -488,16 +490,18 @@ Native language: {native_lang_name}
 Available translations: {json.dumps(translations, ensure_ascii=False)}
 
 Requirements:
-1. Question: "What is the {source_lang_name} word for '{primary_translation}'?"
-2. Generate 4 options in {source_lang_name}: 1 correct ('{phrase_text}') + 3 distractors
-3. Distractors should be plausible {source_lang_name} words but clearly wrong for this meaning
-4. Distractors should be at similar difficulty level
-5. The order of options in your response doesn't matter - they will be randomized
-6. Return ONLY valid JSON, no other text
+1. Question: "What is the {source_lang_name} word for \"{primary_translation}\"?"
+2. IMPORTANT: Use double quotes around the phrase, not single quotes
+3. IMPORTANT: End the question with a question mark (for multiple choice questions)
+4. Generate 4 options in {source_lang_name}: 1 correct ('{phrase_text}') + 3 distractors
+5. Distractors should be plausible {source_lang_name} words but clearly wrong for this meaning
+6. Distractors should be at similar difficulty level
+7. The order of options in your response doesn't matter - they will be randomized
+8. Return ONLY valid JSON, no other text
 
 Return format:
 {{
-  "question": "What is the {source_lang_name} word for '{primary_translation}'?",
+  "question": "What is the {source_lang_name} word for \"{primary_translation}\"?",
   "options": ["{phrase_text}", "distractor1", "distractor2", "distractor3"],
   "correct_answer": "{phrase_text}",
   "question_language": "{native_language}",
@@ -600,14 +604,16 @@ Target language (native): {native_lang_name}
 Available translations: {json.dumps(translations, ensure_ascii=False)}
 
 Requirements:
-1. Question: "Type the {native_lang_name} translation of '{phrase_text}'"
-2. No multiple choice options - user types the answer
-3. If the word has multiple valid meanings, list ALL in correct_answer as an array
-4. Return ONLY valid JSON, no other text
+1. Question: "Type the {native_lang_name} translation of \"{phrase_text}\"."
+2. IMPORTANT: Use double quotes around the phrase, not single quotes
+3. IMPORTANT: End the question with a period
+4. No multiple choice options - user types the answer
+5. If the word has multiple valid meanings, list ALL in correct_answer as an array
+6. Return ONLY valid JSON, no other text
 
 Return format:
 {{
-  "question": "Type the {native_lang_name} translation of '{phrase_text}'",
+  "question": "Type the {native_lang_name} translation of \"{phrase_text}\".",
   "options": null,
   "correct_answer": "cat",
   "question_language": "{native_language}",
@@ -616,7 +622,7 @@ Return format:
 
 If multiple meanings exist, use this format:
 {{
-  "question": "Type the {native_lang_name} translation of '{phrase_text}'",
+  "question": "Type the {native_lang_name} translation of \"{phrase_text}\".",
   "options": null,
   "correct_answer": ["cat", "feline"],
   "question_language": "{native_language}",
@@ -748,14 +754,16 @@ Correct answer in {source_lang_name}: "{phrase_text}"
 Available translations: {json.dumps(translations, ensure_ascii=False)}
 
 Requirements:
-1. Question: "Type the {source_lang_name} word for '{native_translation}'"
-2. No multiple choice options - user types the answer
-3. The correct answer is the original phrase: "{phrase_text}"
-4. Return ONLY valid JSON, no other text
+1. Question: "Type the {source_lang_name} word for \"{native_translation}\"."
+2. IMPORTANT: Use double quotes around the phrase, not single quotes
+3. IMPORTANT: End the question with a period
+4. No multiple choice options - user types the answer
+5. The correct answer is the original phrase: "{phrase_text}"
+6. Return ONLY valid JSON, no other text
 
 Return format:
 {{
-  "question": "Type the {source_lang_name} word for '{native_translation}'",
+  "question": "Type the {source_lang_name} word for \"{native_translation}\".",
   "options": null,
   "correct_answer": "{phrase_text}",
   "question_language": "{native_language}",
