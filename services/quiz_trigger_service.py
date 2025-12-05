@@ -7,7 +7,7 @@ and spaced repetition scheduling.
 
 import logging
 from datetime import date
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 from models import db
 from models.user import User
 from models.user_learning_progress import UserLearningProgress
@@ -217,3 +217,124 @@ class QuizTriggerService:
                 exc_info=True
             )
             return None
+
+    @staticmethod
+    def get_filtered_phrases_for_practice(
+        user: User,
+        stage: str = 'all',
+        language_code: str = 'all',
+        due_for_review: bool = False,
+        exclude_phrase_ids: Optional[List[int]] = None
+    ) -> Tuple[Optional[UserLearningProgress], int]:
+        """
+        Select phrases for practice mode with flexible filtering.
+
+        This method extends get_phrase_for_quiz() with additional filtering options
+        for the Practice page. It returns both the next phrase to practice AND the
+        total count of matching phrases for progress tracking.
+
+        Args:
+            user (User): The user instance to get phrases for
+            stage (str): Filter by learning stage ('all', 'basic', 'intermediate',
+                        'advanced', 'mastered'). Default: 'all'
+            language_code (str): Filter by language ISO code or 'all'. Default: 'all'
+            due_for_review (bool): If True, only include phrases where
+                                  next_review_date <= today. Default: False
+            exclude_phrase_ids (List[int], optional): List of phrase IDs to exclude
+                                                     (already seen in current session)
+
+        Returns:
+            Tuple[UserLearningProgress or None, int]:
+                - First element: The learning progress record for the next phrase,
+                                or None if no eligible phrases found
+                - Second element: Total count of phrases matching the filters
+
+        Examples:
+            >>> # Get all phrases due for review in German, basic stage
+            >>> progress, total = QuizTriggerService.get_filtered_phrases_for_practice(
+            ...     user, stage='basic', language_code='de', due_for_review=True
+            ... )
+            >>> print(f"Question 1 of {total}")
+
+            >>> # Get next phrase excluding already seen ones
+            >>> progress, total = QuizTriggerService.get_filtered_phrases_for_practice(
+            ...     user, exclude_phrase_ids=[1, 5, 12]
+            ... )
+
+        Implementation Notes:
+            - Always includes is_quizzable=True filter
+            - When language_code='all', uses user's translator_languages
+            - Orders by next_review_date ASC (most overdue first)
+            - Returns (None, 0) if no phrases match filters
+        """
+        try:
+            # Validate user
+            if not user or not hasattr(user, 'id'):
+                logger.error("get_filtered_phrases_for_practice called with invalid user")
+                return (None, 0)
+
+            # Build base query
+            query = UserLearningProgress.query.join(
+                Phrase, UserLearningProgress.phrase_id == Phrase.id
+            ).filter(
+                UserLearningProgress.user_id == user.id,
+                Phrase.is_quizzable == True
+            )
+
+            # Apply stage filter
+            if stage != 'all':
+                query = query.filter(UserLearningProgress.stage == stage)
+                logger.debug(f"Filtering by stage: {stage}")
+
+            # Apply language filter
+            if language_code != 'all':
+                query = query.filter(Phrase.language_code == language_code)
+                logger.debug(f"Filtering by language: {language_code}")
+            else:
+                # Use user's active translator languages
+                active_languages = getattr(user, 'translator_languages', None)
+                if not active_languages or not isinstance(active_languages, list) or len(active_languages) == 0:
+                    logger.debug(f"User {user.id} has no active translator languages")
+                    return (None, 0)
+                query = query.filter(Phrase.language_code.in_(active_languages))
+
+            # Apply due for review filter
+            if due_for_review:
+                query = query.filter(UserLearningProgress.next_review_date <= date.today())
+                logger.debug("Filtering by due for review (next_review_date <= today)")
+
+            # Apply exclusion filter (phrases already seen in current session)
+            if exclude_phrase_ids and len(exclude_phrase_ids) > 0:
+                query = query.filter(UserLearningProgress.phrase_id.notin_(exclude_phrase_ids))
+                logger.debug(f"Excluding {len(exclude_phrase_ids)} phrase IDs")
+
+            # Order by most overdue first (spaced repetition priority)
+            query = query.order_by(UserLearningProgress.next_review_date.asc())
+
+            # Get total count of matching phrases
+            total_count = query.count()
+
+            # Get first phrase
+            next_phrase = query.first()
+
+            if next_phrase:
+                logger.debug(
+                    f"Selected phrase_id={next_phrase.phrase_id} for practice "
+                    f"(user_id={user.id}, stage={next_phrase.stage}, "
+                    f"total_matching={total_count})"
+                )
+            else:
+                logger.debug(
+                    f"No phrases found for practice "
+                    f"(user_id={user.id}, filters: stage={stage}, "
+                    f"language={language_code}, due={due_for_review})"
+                )
+
+            return (next_phrase, total_count)
+
+        except Exception as e:
+            logger.error(
+                f"Error in get_filtered_phrases_for_practice for user_id={user.id}: {str(e)}",
+                exc_info=True
+            )
+            return (None, 0)

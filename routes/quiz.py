@@ -250,3 +250,137 @@ def skip_quiz():
 
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+
+@bp.route('/practice/next', methods=['GET'])
+@login_required
+def get_practice_question():
+    """
+    Get next practice question with flexible filtering.
+
+    This endpoint supports the Practice page, allowing users to manually practice
+    vocabulary with custom filters. Unlike /next, this endpoint:
+    - Accepts multiple filter parameters (stage, language, due_for_review)
+    - Returns total count of matching phrases for progress tracking
+    - Supports exclusion list to avoid repeating phrases in the same session
+    - Does NOT reset searches_since_last_quiz counter
+
+    Query Parameters:
+        stage (str, optional): Filter by learning stage. Options:
+            - 'all' (default): All stages
+            - 'basic': Basic stage only
+            - 'intermediate': Intermediate stage only
+            - 'advanced': Advanced stage only
+            - 'mastered': Mastered stage only
+        language_code (str, optional): Filter by language ISO code or 'all' (default)
+        due_for_review (str, optional): 'true' or 'false' (default: 'false')
+            - If 'true', only returns phrases where next_review_date <= today
+        exclude_phrase_ids (str, optional): Comma-separated phrase IDs to exclude
+            - Example: '1,5,12' excludes phrases with IDs 1, 5, and 12
+
+    Returns:
+        200: Practice question with progress tracking
+            {
+                "quiz_attempt_id": 123,
+                "question": "What is the English translation of 'Katze'?",
+                "options": ["cat", "dog", "house", "tree"],
+                "question_type": "multiple_choice_target",
+                "phrase_id": 456,
+                "current_position": 3,
+                "total_matching": 15
+            }
+        200: No more phrases available (session complete)
+            {
+                "quiz_attempt_id": null,
+                "message": "No phrases match your filters",
+                "total_completed": 10
+            }
+        400: Invalid parameters
+            {
+                "error": "Invalid stage value"
+            }
+        500: Server error
+            {
+                "error": "Error message"
+            }
+
+    Implementation Notes:
+        - Uses QuizTriggerService.get_filtered_phrases_for_practice() for phrase selection
+        - Generates questions using existing QuestionGenerationService
+        - Does NOT affect automatic quiz triggering (searches_since_last_quiz unchanged)
+        - Progress tracking: current_position = (excluded count + 1)
+    """
+    try:
+        # Parse query parameters
+        stage = request.args.get('stage', 'all')
+        language_code = request.args.get('language_code', 'all')
+        due_for_review_str = request.args.get('due_for_review', 'false')
+        exclude_phrase_ids_str = request.args.get('exclude_phrase_ids', '')
+
+        # Validate stage parameter
+        valid_stages = ['all', 'basic', 'intermediate', 'advanced', 'mastered']
+        if stage not in valid_stages:
+            return jsonify({
+                'error': f'Invalid stage value. Must be one of: {", ".join(valid_stages)}'
+            }), 400
+
+        # Parse due_for_review boolean
+        due_for_review = due_for_review_str.lower() == 'true'
+
+        # Parse exclude_phrase_ids list
+        exclude_phrase_ids = []
+        if exclude_phrase_ids_str:
+            try:
+                exclude_phrase_ids = [int(pid.strip()) for pid in exclude_phrase_ids_str.split(',') if pid.strip()]
+            except ValueError:
+                return jsonify({
+                    'error': 'Invalid exclude_phrase_ids format. Must be comma-separated integers.'
+                }), 400
+
+        # Get filtered phrase for practice
+        progress, total_count = QuizTriggerService.get_filtered_phrases_for_practice(
+            user=current_user,
+            stage=stage,
+            language_code=language_code,
+            due_for_review=due_for_review,
+            exclude_phrase_ids=exclude_phrase_ids
+        )
+
+        # If no phrases match filters
+        if not progress:
+            return jsonify({
+                'quiz_attempt_id': None,
+                'message': 'No phrases match your filters',
+                'total_completed': len(exclude_phrase_ids)
+            })
+
+        # Create quiz attempt
+        quiz_attempt = QuizAttemptService.create_quiz_attempt(
+            user_id=current_user.id,
+            phrase_id=progress.phrase_id
+        )
+
+        # Generate question
+        question_data = QuestionGenerationService.generate_question(quiz_attempt)
+
+        # Calculate current position (excludes count + 1 for current question)
+        current_position = len(exclude_phrase_ids) + 1
+
+        # Commit to database
+        db.session.commit()
+
+        return jsonify({
+            'quiz_attempt_id': quiz_attempt.id,
+            'question': question_data['question'],
+            'options': question_data.get('options'),
+            'question_type': quiz_attempt.question_type,
+            'phrase_id': progress.phrase_id,
+            'current_position': current_position,
+            'total_matching': total_count
+        })
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500

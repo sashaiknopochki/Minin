@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Translate from './pages/Translate'
 import Learn from './pages/Learn'
+import Practice from './pages/Practice'
 import History from './pages/History'
 import LanguageSetup from './components/LanguageSetup'
 import Login from './pages/Login'
@@ -34,6 +35,7 @@ function App() {
           <Route index element={<Navigate to="/translate" replace />} />
           <Route path="translate" element={<Translate />} />
           <Route path="learn" element={<Learn />} />
+          <Route path="practice" element={<Practice />} />
           <Route path="history" element={<History />} />
         </Route>
         <Route path="/login" element={<Login />} />

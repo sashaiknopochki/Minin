@@ -66,6 +66,16 @@ export default function Layout() {
                     Learn
                   </Link>
                   <Link
+                    to="/practice"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "text-left px-4 py-2 rounded-md transition-colors hover:bg-accent",
+                      isActive('/practice') && "font-bold"
+                    )}
+                  >
+                    Practice
+                  </Link>
+                  <Link
                     to="/history"
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
@@ -113,6 +123,18 @@ export default function Layout() {
                     )}
                   >
                     <Link to="/learn">Learn</Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink
+                    asChild
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "cursor-pointer bg-transparent",
+                      isActive('/practice') && "font-bold"
+                    )}
+                  >
+                    <Link to="/practice">Practice</Link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
