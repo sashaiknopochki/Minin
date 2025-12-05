@@ -30,6 +30,10 @@ export default function Practice() {
 
   // User languages
   const userLanguages = user?.translator_languages || []
+  const primaryLanguage = user?.primary_language_code || "en"
+
+  // Combine all languages (primary + translator languages)
+  const allLanguages = [primaryLanguage, ...userLanguages.filter((lang: string) => lang !== primaryLanguage)]
 
   // Fetch next question
   const fetchNextQuestion = async () => {
@@ -199,6 +203,32 @@ export default function Practice() {
 
       {/* Filters Section */}
       <div className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-4">
+        {/* Language Filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground mr-2">
+            Filter by language:
+          </span>
+          <ButtonGroup>
+            <Button
+              variant={selectedLanguage === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleLanguageChange("all")}
+            >
+              All languages
+            </Button>
+            {allLanguages.map((langCode) => (
+              <Button
+                key={langCode}
+                variant={selectedLanguage === langCode ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleLanguageChange(langCode)}
+              >
+                {getLanguageName(langCode)}
+              </Button>
+            ))}
+          </ButtonGroup>
+        </div>
+
         {/* Stage Filter */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground mr-2">
@@ -233,39 +263,6 @@ export default function Practice() {
             >
               Advanced
             </Button>
-            <Button
-              variant={selectedStage === "mastered" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleStageChange("mastered")}
-            >
-              Mastered
-            </Button>
-          </ButtonGroup>
-        </div>
-
-        {/* Language Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground mr-2">
-            Filter by language:
-          </span>
-          <ButtonGroup>
-            <Button
-              variant={selectedLanguage === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleLanguageChange("all")}
-            >
-              All languages
-            </Button>
-            {userLanguages.map((langCode) => (
-              <Button
-                key={langCode}
-                variant={selectedLanguage === langCode ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleLanguageChange(langCode)}
-              >
-                {getLanguageName(langCode)}
-              </Button>
-            ))}
           </ButtonGroup>
         </div>
 
