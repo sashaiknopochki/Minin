@@ -86,7 +86,7 @@ export function QuizDialog({
                   disabled={isLoading}
                   className="w-full sm:w-auto"
                 >
-                  Continue practicing
+                  Next question
                 </Button>
               )}
             </>

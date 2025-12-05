@@ -273,6 +273,16 @@ class QuizTriggerService:
                 logger.error("get_filtered_phrases_for_practice called with invalid user")
                 return (None, 0)
 
+            # Log user details for debugging
+            active_languages = getattr(user, 'translator_languages', None)
+            logger.info(
+                f"🔍 DEBUG Practice Query - User: {user.id}, "
+                f"Filters: stage={stage}, language_code={language_code}, due={due_for_review}, "
+                f"exclude_count={len(exclude_phrase_ids) if exclude_phrase_ids else 0}"
+            )
+            logger.info(f"   User translator_languages: {active_languages}")
+            logger.info(f"   User primary_language_code: {getattr(user, 'primary_language_code', 'N/A')}")
+
             # Build base query
             query = UserLearningProgress.query.join(
                 Phrase, UserLearningProgress.phrase_id == Phrase.id
@@ -281,32 +291,41 @@ class QuizTriggerService:
                 Phrase.is_quizzable == True
             )
 
+            # Count after base filters
+            count_after_base = query.count()
+            logger.info(f"   After base filters (user_id + is_quizzable): {count_after_base} phrases")
+
             # Apply stage filter
             if stage != 'all':
                 query = query.filter(UserLearningProgress.stage == stage)
-                logger.debug(f"Filtering by stage: {stage}")
+                count_after_stage = query.count()
+                logger.info(f"   After stage filter ({stage}): {count_after_stage} phrases")
 
             # Apply language filter
             if language_code != 'all':
                 query = query.filter(Phrase.language_code == language_code)
-                logger.debug(f"Filtering by language: {language_code}")
+                count_after_lang = query.count()
+                logger.info(f"   After language filter ({language_code}): {count_after_lang} phrases")
             else:
                 # Use user's active translator languages
-                active_languages = getattr(user, 'translator_languages', None)
                 if not active_languages or not isinstance(active_languages, list) or len(active_languages) == 0:
-                    logger.debug(f"User {user.id} has no active translator languages")
+                    logger.warning(f"❌ User {user.id} has no active translator languages")
                     return (None, 0)
                 query = query.filter(Phrase.language_code.in_(active_languages))
+                count_after_lang = query.count()
+                logger.info(f"   After language filter (in {active_languages}): {count_after_lang} phrases")
 
             # Apply due for review filter
             if due_for_review:
                 query = query.filter(UserLearningProgress.next_review_date <= date.today())
-                logger.debug("Filtering by due for review (next_review_date <= today)")
+                count_after_due = query.count()
+                logger.info(f"   After due filter (next_review_date <= today): {count_after_due} phrases")
 
             # Apply exclusion filter (phrases already seen in current session)
             if exclude_phrase_ids and len(exclude_phrase_ids) > 0:
                 query = query.filter(UserLearningProgress.phrase_id.notin_(exclude_phrase_ids))
-                logger.debug(f"Excluding {len(exclude_phrase_ids)} phrase IDs")
+                count_after_exclude = query.count()
+                logger.info(f"   After exclusion filter: {count_after_exclude} phrases")
 
             # Order by most overdue first (spaced repetition priority)
             query = query.order_by(UserLearningProgress.next_review_date.asc())
@@ -318,14 +337,15 @@ class QuizTriggerService:
             next_phrase = query.first()
 
             if next_phrase:
-                logger.debug(
-                    f"Selected phrase_id={next_phrase.phrase_id} for practice "
-                    f"(user_id={user.id}, stage={next_phrase.stage}, "
-                    f"total_matching={total_count})"
+                phrase = next_phrase.phrase
+                logger.info(
+                    f"✅ Selected phrase for practice: '{phrase.text}' ({phrase.language_code}), "
+                    f"stage={next_phrase.stage}, next_review={next_phrase.next_review_date}, "
+                    f"total_matching={total_count}"
                 )
             else:
-                logger.debug(
-                    f"No phrases found for practice "
+                logger.warning(
+                    f"❌ No phrases found for practice "
                     f"(user_id={user.id}, filters: stage={stage}, "
                     f"language={language_code}, due={due_for_review})"
                 )

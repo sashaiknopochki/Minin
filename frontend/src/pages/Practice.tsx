@@ -49,7 +49,7 @@ export default function Practice() {
         ...(excludeIds && { exclude_phrase_ids: excludeIds }),
       })
 
-      const response = await fetch(`/api/quiz/practice/next?${params}`, {
+      const response = await fetch(`/quiz/practice/next?${params}`, {
         credentials: "include",
       })
 
@@ -84,7 +84,7 @@ export default function Practice() {
 
     setLoading(true)
     try {
-      const response = await fetch("/api/quiz/answer", {
+      const response = await fetch("/quiz/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -116,7 +116,7 @@ export default function Practice() {
     if (!quizData) return
 
     try {
-      const response = await fetch("/api/quiz/skip", {
+      const response = await fetch("/quiz/skip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -269,7 +269,7 @@ export default function Practice() {
         {/* Due for Review Toggle */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground mr-2">
-            Due for review only:
+            Due today only:
           </span>
           <Button
             variant={dueForReview ? "default" : "outline"}
@@ -355,7 +355,7 @@ export default function Practice() {
                   onClick={handleContinue}
                   disabled={loading}
                 >
-                  Continue practicing
+                  Next question
                 </Button>
               )}
             </div>
