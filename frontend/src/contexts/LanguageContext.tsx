@@ -1,4 +1,4 @@
-import {createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { Language } from '@/types/language';
 import { useLanguages } from '@/hooks/useLanguages';
 
@@ -7,6 +7,7 @@ interface LanguageContextType {
   loading: boolean;
   error: string | null;
   clearCache: () => void;
+  getLanguageName: (code: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

@@ -70,5 +70,11 @@ export function useLanguages() {
     localStorage.removeItem(CACHE_KEY);
   };
 
-  return { languages, loading, error, clearCache };
+  // Helper function to get language name by code
+  const getLanguageName = (code: string): string => {
+    const language = languages.find((lang) => lang.code === code);
+    return language ? language.en_name : code.toUpperCase();
+  };
+
+  return { languages, loading, error, clearCache, getLanguageName };
 }

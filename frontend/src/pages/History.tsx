@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useSearchParams } from "react-router-dom";
 import {
   Table,
@@ -52,6 +53,7 @@ interface HistoryResponse {
 
 export default function History() {
   const { user } = useAuth();
+  const { getLanguageName } = useLanguageContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const [historyData, setHistoryData] = useState<SearchHistoryItem[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
@@ -173,23 +175,6 @@ export default function History() {
       newDeletingIds.delete(searchId);
       setDeletingIds(newDeletingIds);
     }
-  };
-
-  // Get language name helper
-  const getLanguageName = (code: string) => {
-    const languageNames: { [key: string]: string } = {
-      en: "English",
-      de: "German",
-      ru: "Russian",
-      es: "Spanish",
-      fr: "French",
-      it: "Italian",
-      pt: "Portuguese",
-      zh: "Chinese",
-      ja: "Japanese",
-      ko: "Korean",
-    };
-    return languageNames[code] || code.toUpperCase();
   };
 
   // Format date as DD.MM.YYYY

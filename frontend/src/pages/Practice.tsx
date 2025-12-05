@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { QuizQuestion, type QuizData, type QuizResult } from "@/components/QuizQuestion"
 import { useAuth } from "@/contexts/AuthContext"
+import { useLanguageContext } from "@/contexts/LanguageContext"
 import { Loader2 } from "lucide-react"
 
 export default function Practice() {
   const { user } = useAuth()
+  const { getLanguageName } = useLanguageContext()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Get filter values from URL params
@@ -28,24 +30,6 @@ export default function Practice() {
 
   // User languages
   const userLanguages = user?.translator_languages || []
-
-  // Language name helper (following History.tsx pattern)
-  const getLanguageName = (code: string) => {
-    const languageNames: { [key: string]: string } = {
-      en: "English",
-      de: "German",
-      ru: "Russian",
-      es: "Spanish",
-      fr: "French",
-      it: "Italian",
-      pt: "Portuguese",
-      ja: "Japanese",
-      ko: "Korean",
-      "zh-CN": "Chinese (Simplified)",
-      "zh-TW": "Chinese (Traditional)",
-    }
-    return languageNames[code] || code.toUpperCase()
-  }
 
   // Fetch next question
   const fetchNextQuestion = async () => {
