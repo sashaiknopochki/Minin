@@ -2,12 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Loader2, Copy, Check } from "lucide-react";
 import EtherealTorusFlow from "@/components/EtherealTorusFlow";
 import { QuizDialog } from "@/components/QuizDialog";
+import { LanguageInput } from "@/components/LanguageInput";
 
 interface TranslationResult {
   [language: string]: [string, string, string][];
@@ -272,10 +271,10 @@ export default function Translate() {
     else if (fieldNumber === 2) setTranslations2(null);
     else setTranslations3(null);
 
-    // Clear spelling suggestion when user manually types
-    if (fieldNumber === 1) setSpellingSuggestion1(null);
-    else if (fieldNumber === 2) setSpellingSuggestion2(null);
-    else setSpellingSuggestion3(null);
+    // Clear ALL spelling suggestions when any input changes
+    setSpellingSuggestion1(null);
+    setSpellingSuggestion2(null);
+    setSpellingSuggestion3(null);
 
     setSourceField(fieldNumber);
 
@@ -393,6 +392,11 @@ export default function Translate() {
     setTranslations3(null);
     setSourceField(null);
     setTranslationError(null);
+
+    // Clear all spelling suggestions when clearing
+    setSpellingSuggestion1(null);
+    setSpellingSuggestion2(null);
+    setSpellingSuggestion3(null);
   };
 
   // Copy field function
@@ -596,13 +600,9 @@ export default function Translate() {
       {/* Main Content */}
       <main className="w-full pt-12 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* First Input */}
-          <div className="flex flex-col gap-6">
-            {user ? (
-              <div className="text-base font-medium text-left">
-                {getLanguageName(lang1)}
-              </div>
-            ) : (
+          {/* Language selector for non-authenticated users */}
+          {!user && (
+            <>
               <Select value={lang1} onValueChange={setLang1} disabled={languagesLoading}>
                 <SelectTrigger className="h-9 bg-background">
                   <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
@@ -619,81 +619,7 @@ export default function Translate() {
                   )}
                 </SelectContent>
               </Select>
-            )}
 
-            <div className="relative">
-              <Textarea
-                value={text1}
-                onChange={(e) => handleTextChange(1, e.target.value)}
-                placeholder={`Enter text in ${getLanguageName(lang1)}`}
-                className={`h-60 resize-none bg-background pr-10 text-xl ${
-                  sourceField === 1 ? "ring-2 ring-primary" : ""
-                } ${translating && sourceField === 1 ? "opacity-50" : ""}`}
-                disabled={translating && sourceField !== 1}
-              />
-              {text1 && (
-                <>
-                  <button
-                    onClick={() => clearField(1)}
-                    className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                    aria-label="Clear field"
-                  >
-                    <X className="h-5 w-5 text-muted-foreground" />
-                  </button>
-                  <button
-                    onClick={() => copyField(1)}
-                    className="absolute bottom-2 left-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                    aria-label="Copy to clipboard"
-                  >
-                    {copiedField === 1 ? (
-                      <Check className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <Copy className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </button>
-                </>
-              )}
-              {translating && sourceField === 1 && (
-                <div className="absolute bottom-2 right-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
-            </div>
-
-            {/* Spelling Suggestion for Field 1 */}
-            {spellingSuggestion1 && (
-              <div className="text-sm text-muted-foreground">
-                Did you mean{" "}
-                <button
-                  onClick={() => handleSpellingSuggestionClick(1, spellingSuggestion1)}
-                  className="text-primary hover:underline font-medium cursor-pointer"
-                >
-                  {spellingSuggestion1}
-                </button>
-                ?
-              </div>
-            )}
-
-            {translations1 && translations1.length > 0 && (
-              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
-                {translations1.map(([word, grammarInfo, context], index) => (
-                  <div key={index} className="flex flex-col gap-2">
-                    <div className="text-base font-medium">{word}</div>
-                    <div className="text-xs text-muted-foreground">{grammarInfo}</div>
-                    <div className="text-sm text-muted-foreground">{context}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Second Input */}
-          <div className="flex flex-col gap-6">
-            {user ? (
-              <div className="text-base font-medium text-left">
-                {getLanguageName(lang2)}
-              </div>
-            ) : (
               <Select value={lang2} onValueChange={setLang2} disabled={languagesLoading}>
                 <SelectTrigger className="h-9 bg-background">
                   <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
@@ -710,81 +636,7 @@ export default function Translate() {
                   )}
                 </SelectContent>
               </Select>
-            )}
 
-            <div className="relative">
-              <Textarea
-                value={text2}
-                onChange={(e) => handleTextChange(2, e.target.value)}
-                placeholder={`Enter text in ${getLanguageName(lang2)}`}
-                className={`h-60 resize-none bg-background pr-10 text-xl ${
-                  sourceField === 2 ? "ring-2 ring-primary" : ""
-                } ${translating && sourceField === 2 ? "opacity-50" : ""}`}
-                disabled={translating && sourceField !== 2}
-              />
-              {text2 && (
-                <>
-                  <button
-                    onClick={() => clearField(2)}
-                    className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                    aria-label="Clear field"
-                  >
-                    <X className="h-5 w-5 text-muted-foreground" />
-                  </button>
-                  <button
-                    onClick={() => copyField(2)}
-                    className="absolute bottom-2 left-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                    aria-label="Copy to clipboard"
-                  >
-                    {copiedField === 2 ? (
-                      <Check className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <Copy className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </button>
-                </>
-              )}
-              {translating && sourceField === 2 && (
-                <div className="absolute bottom-2 right-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
-            </div>
-
-            {/* Spelling Suggestion for Field 2 */}
-            {spellingSuggestion2 && (
-              <div className="text-sm text-muted-foreground">
-                Did you mean{" "}
-                <button
-                  onClick={() => handleSpellingSuggestionClick(2, spellingSuggestion2)}
-                  className="text-primary hover:underline font-medium cursor-pointer"
-                >
-                  {spellingSuggestion2}
-                </button>
-                ?
-              </div>
-            )}
-
-            {translations2 && translations2.length > 0 && (
-              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
-                {translations2.map(([word, grammarInfo, context], index) => (
-                  <div key={index} className="flex flex-col gap-2">
-                    <div className="text-base font-medium">{word}</div>
-                    <div className="text-xs text-muted-foreground">{grammarInfo}</div>
-                    <div className="text-sm text-muted-foreground">{context}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Third Input */}
-          <div className="flex flex-col gap-6">
-            {user ? (
-              <div className="text-base font-medium text-left">
-                {getLanguageName(lang3)}
-              </div>
-            ) : (
               <Select value={lang3} onValueChange={setLang3} disabled={languagesLoading}>
                 <SelectTrigger className="h-9 bg-background">
                   <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
@@ -801,59 +653,58 @@ export default function Translate() {
                   )}
                 </SelectContent>
               </Select>
-            )}
+            </>
+          )}
+        </div>
 
-            <div className="relative">
-              <Textarea
-                value={text3}
-                onChange={(e) => handleTextChange(3, e.target.value)}
-                placeholder={`Enter text in ${getLanguageName(lang3)}`}
-                className={`h-60 resize-none bg-background pr-10 text-xl ${
-                  sourceField === 3 ? "ring-2 ring-primary" : ""
-                } ${translating && sourceField === 3 ? "opacity-50" : ""}`}
-                disabled={translating && sourceField !== 3}
-              />
-              {text3 && (
-                <>
-                  <button
-                    onClick={() => clearField(3)}
-                    className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                    aria-label="Clear field"
-                  >
-                    <X className="h-5 w-5 text-muted-foreground" />
-                  </button>
-                  <button
-                    onClick={() => copyField(3)}
-                    className="absolute bottom-2 left-2 h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                    aria-label="Copy to clipboard"
-                  >
-                    {copiedField === 3 ? (
-                      <Check className="h-5 w-5 text-muted-foreground" />
-                    ) : (
-                      <Copy className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </button>
-                </>
-              )}
-              {translating && sourceField === 3 && (
-                <div className="absolute bottom-2 right-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mt-6">
+          {/* First Input */}
+          <LanguageInput
+            languageName={getLanguageName(lang1)}
+            value={text1}
+            onChange={(value) => handleTextChange(1, value)}
+            onClear={() => clearField(1)}
+            onCopy={() => copyField(1)}
+            isSource={sourceField === 1}
+            isTranslating={translating}
+            isCopied={copiedField === 1}
+            placeholder={`Enter text in ${getLanguageName(lang1)}`}
+            spellingSuggestion={spellingSuggestion1}
+            onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(1, correction)}
+            translations={translations1}
+          />
 
-            {translations3 && translations3.length > 0 && (
-              <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
-                {translations3.map(([word, grammarInfo, context], index) => (
-                  <div key={index} className="flex flex-col gap-2">
-                    <div className="text-base font-medium">{word}</div>
-                    <div className="text-xs text-muted-foreground">{grammarInfo}</div>
-                    <div className="text-sm text-muted-foreground">{context}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Second Input */}
+          <LanguageInput
+            languageName={getLanguageName(lang2)}
+            value={text2}
+            onChange={(value) => handleTextChange(2, value)}
+            onClear={() => clearField(2)}
+            onCopy={() => copyField(2)}
+            isSource={sourceField === 2}
+            isTranslating={translating}
+            isCopied={copiedField === 2}
+            placeholder={`Enter text in ${getLanguageName(lang2)}`}
+            spellingSuggestion={spellingSuggestion2}
+            onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(2, correction)}
+            translations={translations2}
+          />
+
+          {/* Third Input */}
+          <LanguageInput
+            languageName={getLanguageName(lang3)}
+            value={text3}
+            onChange={(value) => handleTextChange(3, value)}
+            onClear={() => clearField(3)}
+            onCopy={() => copyField(3)}
+            isSource={sourceField === 3}
+            isTranslating={translating}
+            isCopied={copiedField === 3}
+            placeholder={`Enter text in ${getLanguageName(lang3)}`}
+            spellingSuggestion={spellingSuggestion3}
+            onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(3, correction)}
+            translations={translations3}
+          />
         </div>
 
         {/* Error Message */}
