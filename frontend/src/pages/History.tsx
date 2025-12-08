@@ -30,11 +30,14 @@ interface Phrase {
   phrase_type: string;
 }
 
+// Each translation meaning is an array: [word, part_of_speech, definition]
+type TranslationMeaning = [string, string, string];
+
 interface SearchHistoryItem {
   id: number;
   phrase: Phrase;
   translations: {
-    [languageCode: string]: string;
+    [languageCode: string]: TranslationMeaning[];
   };
   searched_at: string;
 }
@@ -184,6 +187,15 @@ export default function History() {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}.${month}.${year}`;
+  };
+
+  // Format all translation meanings as a comma-separated string
+  const formatTranslations = (meanings: TranslationMeaning[]): string => {
+    if (!meanings || meanings.length === 0) return "-";
+
+    // Extract just the word/phrase from each meaning [word, part_of_speech, definition]
+    // Join multiple meanings with commas
+    return meanings.map(meaning => meaning[0]).join(", ");
   };
 
   // Loading state
@@ -338,7 +350,7 @@ export default function History() {
                       const isSourceLanguage = langCode === sourceLanguage;
                       const text = isSourceLanguage
                         ? item.phrase.text
-                        : item.translations[langCode] || "-";
+                        : formatTranslations(item.translations[langCode]);
 
                       return (
                         <TableCell
@@ -355,7 +367,7 @@ export default function History() {
                       const isSourceLanguage = langCode === sourceLanguage;
                       const text = isSourceLanguage
                         ? item.phrase.text
-                        : item.translations[langCode] || "-";
+                        : formatTranslations(item.translations[langCode]);
 
                       return (
                         <TableCell

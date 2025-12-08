@@ -113,7 +113,7 @@ def get_history():
         for search in pagination.items:
             # Get translations from llm_translations_json
             # llm_translations_json has language NAMES as keys: {"English": [["cat", "noun", "..."]], "German": [...]}
-            # We need to convert to language CODES: {"en": "cat", "de": "Katze"}
+            # We need to convert to language CODES with full meanings: {"en": [["cat", "noun", "..."], ["tomcat", "noun", "..."]], "de": [...]}
             translations = {}
 
             if search.llm_translations_json:
@@ -124,16 +124,14 @@ def get_history():
                         # Fallback: assume it's already a code if conversion fails
                         lang_code = lang_name
 
-                    # Extract just the first translation word
+                    # Store all translations for this language
                     if isinstance(translation_data, list) and len(translation_data) > 0:
-                        # translation_data is like [["cat", "noun", "a small domesticated carnivorous mammal"]]
-                        # We want just the first word
-                        if isinstance(translation_data[0], list) and len(translation_data[0]) > 0:
-                            translations[lang_code] = translation_data[0][0]
-                        else:
-                            translations[lang_code] = str(translation_data[0])
+                        # translation_data is like [["cat", "noun", "a small domesticated carnivorous mammal"], ["tomcat", "noun", "a male cat"]]
+                        # We want to preserve all meanings
+                        translations[lang_code] = translation_data
                     else:
-                        translations[lang_code] = str(translation_data)
+                        # Fallback: wrap in array format for consistency
+                        translations[lang_code] = [[str(translation_data), "", ""]]
 
             search_item = {
                 'id': search.id,
