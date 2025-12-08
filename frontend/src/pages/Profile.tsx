@@ -20,12 +20,56 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [quizFrequency, setQuizFrequency] = useState<number>(
+    user?.quiz_frequency ?? 5
+  );
+  const [isUpdatingFrequency, setIsUpdatingFrequency] = useState(false);
+
+  const handleQuizFrequencyChange = async (value: string) => {
+    const newFrequency = parseInt(value);
+    setQuizFrequency(newFrequency);
+    setIsUpdatingFrequency(true);
+
+    try {
+      const response = await fetch("/settings/quiz-frequency", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ quiz_frequency: newFrequency }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error("Failed to update quiz frequency:", data.error);
+        alert("Failed to update quiz frequency. Please try again.");
+        // Revert to previous value if update failed
+        setQuizFrequency(user?.quiz_frequency ?? 5);
+      }
+    } catch (error) {
+      console.error("Error updating quiz frequency:", error);
+      alert("An error occurred while updating quiz frequency. Please try again.");
+      // Revert to previous value if update failed
+      setQuizFrequency(user?.quiz_frequency ?? 5);
+    } finally {
+      setIsUpdatingFrequency(false);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
@@ -81,13 +125,31 @@ export default function Profile() {
             <CardHeader>
               <CardTitle className="text-left">Learning</CardTitle>
               <CardDescription className="text-left">
-
+                Customize your learning experience.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-left">
-                Your learning statistics and progress will be displayed here.
-              </p>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 text-left">
+                <p className="text-foreground">
+                  Show quizzes about previously searched words every
+                </p>
+                <Select
+                  value={quizFrequency.toString()}
+                  onValueChange={handleQuizFrequencyChange}
+                  disabled={isUpdatingFrequency}
+                >
+                  <SelectTrigger className="w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-foreground">translations.</p>
+              </div>
             </CardContent>
           </Card>
         </section>
@@ -98,7 +160,7 @@ export default function Profile() {
             <CardHeader>
               <CardTitle className="text-left">Languages</CardTitle>
               <CardDescription className="text-left">
-
+                Change the sequence of your languages at the Translate page.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -115,7 +177,7 @@ export default function Profile() {
             <CardHeader className="text-left">
               <CardTitle>Account</CardTitle>
               <CardDescription className="text-left">
-
+                Manage your account data.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

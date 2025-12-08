@@ -7,6 +7,7 @@ export interface User {
   picture?: string;
   primary_language_code: string;
   translator_languages: string[];
+  quiz_frequency: number;
 }
 
 interface AuthContextType {

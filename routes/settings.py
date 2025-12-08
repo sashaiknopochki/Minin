@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user, logout_user
 from models import db
 from models.user import User
@@ -16,6 +16,61 @@ bp = Blueprint('settings', __name__, url_prefix='/settings')
 @bp.route('/test')
 def test():
     return jsonify({'message': 'Settings blueprint working'})
+
+
+@bp.route('/quiz-frequency', methods=['PATCH'])
+@login_required
+def update_quiz_frequency():
+    """
+    Update the user's quiz frequency setting.
+
+    This controls how often quizzes appear during word searches.
+
+    Request Body:
+        {
+            "quiz_frequency": int (1, 3, 5, or 10)
+        }
+
+    Returns:
+        JSON response with success status and updated value
+    """
+    try:
+        data = request.get_json()
+
+        if not data or 'quiz_frequency' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing quiz_frequency in request body'
+            }), 400
+
+        quiz_frequency = data['quiz_frequency']
+
+        # Validate the value
+        valid_values = [1, 3, 5, 10]
+        if quiz_frequency not in valid_values:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid quiz_frequency. Must be one of: {valid_values}'
+            }), 400
+
+        # Update the user's quiz_frequency
+        current_user.quiz_frequency = quiz_frequency
+        db.session.commit()
+
+        logger.info(f'Updated quiz_frequency to {quiz_frequency} for user {current_user.email}')
+
+        return jsonify({
+            'success': True,
+            'quiz_frequency': quiz_frequency
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f'Error updating quiz_frequency for user {current_user.email}: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': 'Failed to update quiz frequency. Please try again.'
+        }), 500
 
 
 @bp.route('/account', methods=['DELETE'])

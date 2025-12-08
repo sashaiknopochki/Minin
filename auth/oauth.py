@@ -102,7 +102,8 @@ def google_signin():
                     'name': user.name,
                     'picture': picture,
                     'primary_language_code': user.primary_language_code,
-                    'translator_languages': user.translator_languages
+                    'translator_languages': user.translator_languages,
+                    'quiz_frequency': user.quiz_frequency
                 }
             }), 200
 
@@ -216,7 +217,8 @@ def get_current_user():
                 'email': current_user.email,
                 'name': current_user.name,
                 'primary_language_code': current_user.primary_language_code,
-                'translator_languages': current_user.translator_languages
+                'translator_languages': current_user.translator_languages,
+                'quiz_frequency': current_user.quiz_frequency
             }
         }), 200
     else:
@@ -274,7 +276,8 @@ def update_languages():
                 'email': current_user.email,
                 'name': current_user.name,
                 'primary_language_code': current_user.primary_language_code,
-                'translator_languages': current_user.translator_languages
+                'translator_languages': current_user.translator_languages,
+                'quiz_frequency': current_user.quiz_frequency
             }
         }), 200
 
