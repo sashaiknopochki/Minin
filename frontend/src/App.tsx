@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import Translate from './pages/Translate'
 import Practice from './pages/Practice'
 import History from './pages/History'
+import Profile from './pages/Profile'
 import LanguageSetup from './components/LanguageSetup'
 import Login from './pages/Login'
 import './App.css'
@@ -35,6 +36,7 @@ function App() {
           <Route path="translate" element={<Translate />} />
           <Route path="practice" element={<Practice />} />
           <Route path="history" element={<History />} />
+          <Route path="profile" element={<Profile />} />
         </Route>
         <Route path="/login" element={<Login />} />
         <Route path="*" element={<Navigate to="/translate" replace />} />

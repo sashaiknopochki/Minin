@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ export default function UserMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const navigate = useNavigate();
 
   if (!user) return null;
 
@@ -38,6 +40,11 @@ export default function UserMenu() {
 
   const handleLogout = async () => {
     await logout();
+    setOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    navigate("/profile");
     setOpen(false);
   };
 
@@ -68,13 +75,15 @@ export default function UserMenu() {
             </DrawerDescription>
           </DrawerHeader>
           <div className="px-4 pb-6">
-            <button
-              disabled
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground cursor-default"
-            >
-              <UserIcon className="h-4 w-4" />
-              <span>Profile (Coming Soon)</span>
-            </button>
+            <DrawerClose asChild>
+              <button
+                onClick={handleProfileClick}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+              >
+                <UserIcon className="h-4 w-4" />
+                <span>Profile</span>
+              </button>
+            </DrawerClose>
             <DrawerClose asChild>
               <button
                 onClick={handleLogout}
@@ -108,9 +117,9 @@ export default function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled className="cursor-default">
+        <DropdownMenuItem onClick={handleProfileClick} className="cursor-pointer">
           <UserIcon className="mr-2 h-4 w-4" />
-          <span>Profile (Coming Soon)</span>
+          <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
