@@ -57,6 +57,11 @@ export default function Translate() {
   // Track copied state
   const [copiedField, setCopiedField] = useState<1 | 2 | 3 | null>(null);
 
+  // Spelling suggestion state
+  const [spellingSuggestion1, setSpellingSuggestion1] = useState<string | null>(null);
+  const [spellingSuggestion2, setSpellingSuggestion2] = useState<string | null>(null);
+  const [spellingSuggestion3, setSpellingSuggestion3] = useState<string | null>(null);
+
   // Quiz state
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
@@ -148,11 +153,22 @@ export default function Translate() {
       console.log('Translation response:', {
         should_show_quiz: data.should_show_quiz,
         quiz_phrase_id: data.quiz_phrase_id,
-        searches_until_next_quiz: data.searches_until_next_quiz
+        searches_until_next_quiz: data.searches_until_next_quiz,
+        spelling_issue: data.spelling_issue
       });
 
       if (data.success) {
+        // Check for spelling issue
+        if (data.spelling_issue) {
+          return {
+            spellingIssue: true,
+            sentWord: data.sent_word,
+            correctWord: data.correct_word
+          };
+        }
+
         return {
+          spellingIssue: false,
           translations: data.translations,
           source_info: data.source_info,
           shouldShowQuiz: data.should_show_quiz,
@@ -172,6 +188,77 @@ export default function Translate() {
     }
   };
 
+  // Handle spelling suggestion click
+  const handleSpellingSuggestionClick = (fieldNumber: 1 | 2 | 3, correctWord: string) => {
+    // Clear spelling suggestions
+    setSpellingSuggestion1(null);
+    setSpellingSuggestion2(null);
+    setSpellingSuggestion3(null);
+
+    // Update the text field with correct word
+    if (fieldNumber === 1) setText1(correctWord);
+    else if (fieldNumber === 2) setText2(correctWord);
+    else setText3(correctWord);
+
+    // Trigger translation with the correct word
+    setSourceField(fieldNumber);
+
+    // Call translation directly
+    const sourceLang = fieldNumber === 1 ? lang1 : fieldNumber === 2 ? lang2 : lang3;
+    const targetLangs =
+      fieldNumber === 1
+        ? [lang2, lang3]
+        : fieldNumber === 2
+        ? [lang1, lang3]
+        : [lang1, lang2];
+
+    translateText(correctWord, sourceLang, targetLangs).then(result => {
+      if (result && !result.spellingIssue) {
+        const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
+
+        const targetLangNames = targetLangs.map(getLanguageName);
+        const translatedTexts = targetLangNames.map((langName) => {
+          const translation = translations[langName];
+          if (!translation || !Array.isArray(translation) || translation.length === 0) return "";
+          return translation[0][0];
+        });
+
+        const structuredTranslations = targetLangNames.map((langName) => {
+          const translation = translations[langName];
+          return translation || [];
+        });
+
+        const sourceInfoArray = source_info ? [source_info] : null;
+
+        if (fieldNumber === 1) {
+          setText2(translatedTexts[0]);
+          setText3(translatedTexts[1]);
+          setTranslations1(sourceInfoArray);
+          setTranslations2(structuredTranslations[0]);
+          setTranslations3(structuredTranslations[1]);
+        } else if (fieldNumber === 2) {
+          setText1(translatedTexts[0]);
+          setText3(translatedTexts[1]);
+          setTranslations1(structuredTranslations[0]);
+          setTranslations2(sourceInfoArray);
+          setTranslations3(structuredTranslations[1]);
+        } else {
+          setText1(translatedTexts[0]);
+          setText2(translatedTexts[1]);
+          setTranslations1(structuredTranslations[0]);
+          setTranslations2(structuredTranslations[1]);
+          setTranslations3(sourceInfoArray);
+        }
+
+        if (user && shouldShowQuiz && quizPhraseId) {
+          setTimeout(() => {
+            fetchAndShowQuiz(quizPhraseId);
+          }, 2500);
+        }
+      }
+    });
+  };
+
   // Handle text change with debouncing
   const handleTextChange = (
     fieldNumber: 1 | 2 | 3,
@@ -184,6 +271,11 @@ export default function Translate() {
     if (fieldNumber === 1) setTranslations1(null);
     else if (fieldNumber === 2) setTranslations2(null);
     else setTranslations3(null);
+
+    // Clear spelling suggestion when user manually types
+    if (fieldNumber === 1) setSpellingSuggestion1(null);
+    else if (fieldNumber === 2) setSpellingSuggestion2(null);
+    else setSpellingSuggestion3(null);
 
     setSourceField(fieldNumber);
 
@@ -217,6 +309,25 @@ export default function Translate() {
       const result = await translateText(value, sourceLang, targetLangs);
 
       if (result) {
+        // Check for spelling issue
+        if (result.spellingIssue) {
+          // Set spelling suggestion for the source field
+          if (fieldNumber === 1) {
+            setSpellingSuggestion1(result.correctWord);
+            setSpellingSuggestion2(null);
+            setSpellingSuggestion3(null);
+          } else if (fieldNumber === 2) {
+            setSpellingSuggestion1(null);
+            setSpellingSuggestion2(result.correctWord);
+            setSpellingSuggestion3(null);
+          } else {
+            setSpellingSuggestion1(null);
+            setSpellingSuggestion2(null);
+            setSpellingSuggestion3(result.correctWord);
+          }
+          return;
+        }
+
         const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
 
         const targetLangNames = targetLangs.map(getLanguageName);
@@ -549,6 +660,20 @@ export default function Translate() {
               )}
             </div>
 
+            {/* Spelling Suggestion for Field 1 */}
+            {spellingSuggestion1 && (
+              <div className="text-sm text-muted-foreground">
+                Did you mean{" "}
+                <button
+                  onClick={() => handleSpellingSuggestionClick(1, spellingSuggestion1)}
+                  className="text-primary hover:underline font-medium cursor-pointer"
+                >
+                  {spellingSuggestion1}
+                </button>
+                ?
+              </div>
+            )}
+
             {translations1 && translations1.length > 0 && (
               <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
                 {translations1.map(([word, grammarInfo, context], index) => (
@@ -625,6 +750,20 @@ export default function Translate() {
                 </div>
               )}
             </div>
+
+            {/* Spelling Suggestion for Field 2 */}
+            {spellingSuggestion2 && (
+              <div className="text-sm text-muted-foreground">
+                Did you mean{" "}
+                <button
+                  onClick={() => handleSpellingSuggestionClick(2, spellingSuggestion2)}
+                  className="text-primary hover:underline font-medium cursor-pointer"
+                >
+                  {spellingSuggestion2}
+                </button>
+                ?
+              </div>
+            )}
 
             {translations2 && translations2.length > 0 && (
               <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">

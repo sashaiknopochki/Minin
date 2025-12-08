@@ -118,6 +118,16 @@ def translate():
             native_language=native_language
         )
 
+        # Check if spelling issue was detected - return early without caching
+        if result.get("spelling_issue"):
+            return jsonify({
+                "success": True,
+                "spelling_issue": True,
+                "sent_word": result["sent_word"],
+                "correct_word": result["correct_word"],
+                "source_language": result["source_language"]
+            }), 200
+
         # Log the search to database if user is authenticated and translation succeeded
         if current_user.is_authenticated and result.get('success'):
             try:

@@ -264,6 +264,11 @@ def get_or_create_translations(
                 native_language=native_language
             )
 
+            # Check if spelling issue was detected - return early without caching
+            if llm_result.get('spelling_issue'):
+                logger.info(f"Spelling issue detected, not caching: '{llm_result.get('sent_word')}'")
+                return llm_result  # Pass through the spelling issue response
+
             if not llm_result.get('success'):
                 # If we have some cached translations, return those with partial error
                 if cached_translations:

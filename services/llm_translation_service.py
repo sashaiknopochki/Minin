@@ -98,10 +98,13 @@ def translate_text(
     # Initialize OpenAI client
     client = OpenAI(api_key=api_key)
 
-    # Create system prompt for translation with multiple meanings
+    # Create system prompt for translation with spell-checking and multiple meanings
     target_langs_str = ", ".join(target_languages)
-    system_prompt = f"""You are a professional translator and linguist.
-Translate the {source_language} word/phrase "{text}" to the following target languages: {target_langs_str}
+    system_prompt = f"""You are a professional translator, linguist, and spelling checker.
+
+FIRST: Check if the word/phrase "{text}" exists and is correctly spelled in {source_language}. If it's misspelled or invalid, suggest the correct spelling and return empty translations.
+
+THEN: Translate the {source_language} word/phrase "{text}" to the following target languages: {target_langs_str}
 
 IMPORTANT RULES:
 1. Do NOT include {source_language} in your translations (since that's the source language)
@@ -137,7 +140,7 @@ If translating "кошка" from Russian to German with contexts in Russian:
 CORRECT - combining repeated words with grammatical info:
 If translating "собака" from Russian to English with contexts in Russian:
 {{
-  "source_info": ["собака", "существительное, мужской род", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"],
+  "source_info": ["собакаC", "существительное, мужской род", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"],
   "translations": {{
     "English": [["dog", "существительное", "домашнее животное из семейства псовых, презрительное обозначение человека, инструмент для захвата"]]
   }}
@@ -172,6 +175,50 @@ WRONG - DO NOT combine different words:
   }}
 }}"""
 
+    # Create user message with spell-check request and JSON format
+    user_message = f"""Check spelling and translate:
+
+Word/phrase: "{text}"
+Source language: {source_language}
+Target languages: {target_langs_str}
+
+Respond with JSON including spell-check fields:
+{{
+  "word_exists": true/false,
+  "sent_word": "{text}",
+  "correct_word": "suggested_spelling_or_empty_string",
+  "source_info": ["source_word", "grammar_info", "context"],
+  "translations": {{
+    "TargetLanguage1": [["translation", "grammar_info", "context"], ...],
+    "TargetLanguage2": [["translation", "grammar_info", "context"], ...],
+    ...
+  }}
+}}
+
+Examples:
+
+Valid word:
+{{
+  "word_exists": true,
+  "sent_word": "collection",
+  "correct_word": "",
+  "source_info": ["collection", "noun", "a group of things collected"],
+  "translations": {{
+    "German": [["Sammlung", "noun, feminine", "a group of things collected"], ["Kollektion", "noun, feminine", "a fashion/design collection"]],
+    "Russian": [["коллекция", "noun", "собрание предметов"]]
+  }}
+}}
+
+Invalid/misspelled word:
+{{
+  "word_exists": false,
+  "sent_word": "colection",
+  "correct_word": "collection",
+  "source_info": [],
+  "translations": {{}}
+}}
+"""
+
     # Check if model supports structured outputs
     use_structured_output = model in STRUCTURED_OUTPUT_MODELS
 
@@ -179,15 +226,15 @@ WRONG - DO NOT combine different words:
     try:
         logger.info(f"Translating '{text}' from {source_language} to {target_languages}")
 
-        # Prepare API call parameters
+        # Prepare API call parameters with lower temperature for deterministic spell-checking
         api_params = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
+                {"role": "user", "content": user_message}
             ],
-            "temperature": 0.3,
-            "max_tokens": 800
+            "temperature": 0.2,  # Lower temperature for more consistent spell-checking
+            "max_tokens": 1000  # Increased for spell-check fields
         }
 
         # Add structured output for supported models
@@ -211,6 +258,18 @@ WRONG - DO NOT combine different words:
                 "schema": {
                     "type": "object",
                     "properties": {
+                        "word_exists": {
+                            "type": "boolean",
+                            "description": "Whether the word exists and is correctly spelled in the source language"
+                        },
+                        "sent_word": {
+                            "type": "string",
+                            "description": "The original word that was sent"
+                        },
+                        "correct_word": {
+                            "type": "string",
+                            "description": "Suggested correct spelling (empty string if word is valid)"
+                        },
                         "source_info": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -224,7 +283,7 @@ WRONG - DO NOT combine different words:
                             "additionalProperties": False
                         }
                     },
-                    "required": ["source_info", "translations"],
+                    "required": ["word_exists", "sent_word", "correct_word", "source_info", "translations"],
                     "additionalProperties": False
                 }
             }
@@ -245,8 +304,33 @@ WRONG - DO NOT combine different words:
         # Parse JSON response
         try:
             response_data = json.loads(translation_content)
+
+            # Extract spell-check fields (with safe defaults)
+            word_exists = response_data.get("word_exists", True)  # Default to True for safety
+            sent_word = response_data.get("sent_word", text)
+            correct_word = response_data.get("correct_word", "")
+
             translations_dict = response_data.get("translations", {})
             source_info = response_data.get("source_info", [text, "", ""])
+
+            # Check if word doesn't exist (spelling issue detected)
+            if not word_exists:
+                logger.warning(f"Spelling issue detected: '{sent_word}' → suggested: '{correct_word}'")
+                return {
+                    "success": True,
+                    "spelling_issue": True,
+                    "sent_word": sent_word,
+                    "correct_word": correct_word,
+                    "source_language": source_language,
+                    "target_languages": target_languages,
+                    "original_text": text,
+                    "model": model,
+                    "usage": {
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "total_tokens": response.usage.total_tokens
+                    }
+                }
 
             # Fallback if translations not in expected format
             if not translations_dict and isinstance(response_data, dict):
@@ -260,6 +344,7 @@ WRONG - DO NOT combine different words:
 
         return {
             "success": True,
+            "spelling_issue": False,  # Explicitly set for valid words
             "original_text": text,
             "source_language": source_language,
             "target_languages": target_languages,
