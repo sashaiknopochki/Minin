@@ -145,15 +145,17 @@ const EtherealTorusFlow = () => {
 
   return (
       <div style={{
-        width: '1500px',
+        width: '100%',
+        maxWidth: '1500px',
         height: '900px',
         borderRadius: '8px',
         margin: '0 auto',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+
       }}>
-        <canvas ref={canvasRef} />
+        <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto' }} />
     </div>
   );
 };

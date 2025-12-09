@@ -536,8 +536,11 @@ export default function Translate() {
       {!user && (
         <div className="w-full my-8 pt-24">
           <div className="w-full flex flex-col items-center justify-center">
-            <h2 className="w-full text-6xl md:text-7xl lg:text-8xl font-medium text-center px-8">
-              Translate once.<br />Remember forever.
+            <h2 className="w-full text-5xl md:text-6xl lg:text-7xl font-normal font-baskerville leading-tight text-center px-8">
+              Translate once.
+            </h2>
+            <h2 className="w-full text-5xl md:text-6xl lg:text-7xl font-normal font-baskerville leading-tight text-center px-8 pt-3">
+              Remember forever.
             </h2>
             <p className="w-full text-lg md:text-xl lg:text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
             with AI-powered quizzes increasing active vocabulary.</p>
@@ -558,57 +561,52 @@ export default function Translate() {
           fields.length === 2 ? "grid-cols-1 md:grid-cols-2" :
           "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
         )}>
-          {/* Language selector for non-authenticated users */}
-          {!user && fields.map((field) => (
-            <Select
-              key={field.id}
-              value={field.languageCode}
-              onValueChange={(value) => handleLanguageChange(field.id, value)}
-              disabled={languagesLoading}
-            >
-              <SelectTrigger className="h-9 bg-background">
-                <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-              </SelectTrigger>
-              <SelectContent>
-                {languagesError ? (
-                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                ) : (
-                  languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.en_name} ({lang.original_name})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          ))}
-        </div>
-
-        <div className={cn(
-          "grid gap-6 md:gap-8 mt-6",
-          fields.length === 2 ? "grid-cols-1 md:grid-cols-2" :
-          "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-        )}>
           {fields.map((field) => (
-            <LanguageInput
-              key={field.id}
-              languageName={getLanguageName(field.languageCode)}
-              languageCode={field.languageCode}
-              value={field.text}
-              onChange={(value) => handleTextChange(field.id, value)}
-              onClear={clearField}
-              onCopy={() => copyField(field.id)}
-              isSource={sourceFieldId === field.id}
-              isTranslating={translating}
-              isCopied={copiedFieldId === field.id}
-              placeholder={`Enter text in ${getLanguageName(field.languageCode)}`}
-              spellingSuggestion={field.spellingSuggestion}
-              onSpellingSuggestionClick={(correction) =>
-                handleSpellingSuggestionClick(field.id, correction)
-              }
-              translations={field.translations}
-              showLanguageName={!!user}
-            />
+            <div key={field.id} className="flex flex-col gap-2">
+              {/* Language selector for non-authenticated users */}
+              {!user && (
+                <Select
+                  value={field.languageCode}
+                  onValueChange={(value) => handleLanguageChange(field.id, value)}
+                  disabled={languagesLoading}
+                >
+                  <SelectTrigger className="h-9 bg-background">
+                    <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languagesError ? (
+                      <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                    ) : (
+                      languages.map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.en_name} ({lang.original_name})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Language Input */}
+              <LanguageInput
+                languageName={getLanguageName(field.languageCode)}
+                languageCode={field.languageCode}
+                value={field.text}
+                onChange={(value) => handleTextChange(field.id, value)}
+                onClear={clearField}
+                onCopy={() => copyField(field.id)}
+                isSource={sourceFieldId === field.id}
+                isTranslating={translating}
+                isCopied={copiedFieldId === field.id}
+                placeholder={`Enter text in ${getLanguageName(field.languageCode)}`}
+                spellingSuggestion={field.spellingSuggestion}
+                onSpellingSuggestionClick={(correction) =>
+                  handleSpellingSuggestionClick(field.id, correction)
+                }
+                translations={field.translations}
+                showLanguageName={!!user}
+              />
+            </div>
           ))}
         </div>
 
@@ -625,20 +623,20 @@ export default function Translate() {
       {/* How it works section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
-          <h2 className="text-4xl font-medium text-left mb-12">How it works</h2>
+          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">How it works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex flex-col items-center text-left gap-4">
-              <div className="text-3xl font-bold text-left">1</div>
+              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">1</div>
               <p className="text-lg">Set your native language and foreign languages that you learn and use.</p>
             </div>
 
             <div className="flex flex-col items-center text-left gap-4">
-              <div className="text-3xl font-bold text-left">2</div>
+              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">2</div>
               <p className="text-lg">Enter a word in any language and receive a translation to your other languages.</p>
             </div>
 
             <div className="flex flex-col items-center text-left gap-4">
-              <div className="text-3xl font-bold text-left">3</div>
+              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">3</div>
               <p className="text-lg">Solve quizzes about the words that you have translated in order to remember them.</p>
             </div>
           </div>
@@ -648,7 +646,7 @@ export default function Translate() {
       {/* Quiz Cards section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
-          <h2 className="text-4xl font-medium text-left mb-12">Try sample quizzes</h2>
+          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">Try sample quizzes</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
             {/* Beginner Quiz Card */}
@@ -708,7 +706,7 @@ export default function Translate() {
       {/* Problems it solves section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
-          <h2 className="text-4xl font-medium text-left mb-12">Problems it solves</h2>
+          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">Problems it solves</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="flex flex-col text-left gap-4">
               <h3 className="text-2xl font-semibold">Multi-directional Translation: <br />Stop switching translation directions.</h3>
