@@ -1,10 +1,22 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // themes: source follows itself, ever-flowing nature, return to source
 // visualization: Particles flow in an eternal cycle, always returning to their origin
 
 const EtherealTorusFlow = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  // Listen for theme changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -25,6 +37,9 @@ const EtherealTorusFlow = () => {
     // Slightly increase particle count for smoother appearance at slower speeds
     const numParticles = 48000;
     let time = 0;
+
+    // Determine particle color based on theme
+    const particleColor = isDarkMode ? '240, 240, 240' : '40, 40, 40';
 
     // Particle class
     class Particle {
@@ -73,7 +88,7 @@ const EtherealTorusFlow = () => {
       }
 
       draw() {
-        ctx.fillStyle = `rgba(40, 40, 40, ${this.displayOpacity})`;
+        ctx.fillStyle = `rgba(${particleColor}, ${this.displayOpacity})`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.displaySize, 0, Math.PI * 2);
         ctx.fill();
@@ -141,7 +156,7 @@ const EtherealTorusFlow = () => {
       // Clear particles array to prevent memory leaks
       particles.length = 0;
     };
-  }, []);
+  }, [isDarkMode]);
 
   return (
       <div style={{
