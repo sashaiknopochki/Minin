@@ -3,6 +3,7 @@ import { X, Loader2, Copy, Check } from "lucide-react";
 
 interface LanguageInputProps {
   languageName: string;
+  languageCode: string; // Add language code prop for RTL detection
   value: string;
   onChange: (value: string) => void;
   onClear: () => void;
@@ -17,8 +18,12 @@ interface LanguageInputProps {
   showLanguageName?: boolean; // Optional prop to control language name visibility
 }
 
+// RTL languages: Arabic, Hebrew, Persian, Urdu
+const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
+
 export function LanguageInput({
   languageName,
+  languageCode,
   value,
   onChange,
   onClear,
@@ -32,6 +37,7 @@ export function LanguageInput({
   translations,
   showLanguageName = true // Default to true for backward compatibility
 }: LanguageInputProps) {
+  const isRTL = RTL_LANGUAGES.includes(languageCode);
   return (
     <div className="flex flex-col gap-6">
       {showLanguageName && (
@@ -47,7 +53,10 @@ export function LanguageInput({
           placeholder={placeholder}
           className={`h-60 resize-none bg-background pr-10 text-xl ${
             isSource ? "ring-2 ring-primary" : ""
-          } ${isTranslating && isSource ? "opacity-50" : ""}`}
+          } ${isTranslating && isSource ? "opacity-50" : ""} ${
+            isRTL ? "text-right" : ""
+          }`}
+          dir={isRTL ? "rtl" : "ltr"}
           disabled={isTranslating && !isSource}
         />
         {value && (
@@ -81,7 +90,7 @@ export function LanguageInput({
 
       {/* Spelling Suggestion */}
       {spellingSuggestion && (
-        <div className="text-sm text-muted-foreground text-left">
+        <div className={`text-sm text-muted-foreground ${isRTL ? "text-right" : "text-left"}`} dir={isRTL ? "rtl" : "ltr"}>
           Did you mean{" "}
           <button
             onClick={() => onSpellingSuggestionClick(spellingSuggestion)}
@@ -95,7 +104,7 @@ export function LanguageInput({
 
       {/* Translations */}
       {translations && translations.length > 0 && (
-        <div className="flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 text-left gap-y-6">
+        <div className={`flex flex-col gap-3 p-4 rounded-md border border-border bg-muted/30 gap-y-6 ${isRTL ? "text-right" : "text-left"}`} dir={isRTL ? "rtl" : "ltr"}>
           {translations.map(([word, grammarInfo, context], index) => (
             <div key={index} className="flex flex-col gap-2">
               <div className="text-base font-medium">{word}</div>

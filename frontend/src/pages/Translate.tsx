@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import EtherealTorusFlow from "@/components/EtherealTorusFlow";
 import { QuizDialog } from "@/components/QuizDialog";
 import { LanguageInput } from "@/components/LanguageInput";
+import { cn } from "@/lib/utils";
 
 interface TranslationResult {
   [language: string]: [string, string, string][];
@@ -26,40 +27,27 @@ interface QuizResult {
   user_answer: string;
 }
 
+interface LanguageField {
+  id: string;
+  languageCode: string;
+  text: string;
+  translations: [string, string, string][] | null;
+  spellingSuggestion: string | null;
+}
+
 export default function Translate() {
   const { languages, loading: languagesLoading, error: languagesError } = useLanguageContext();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Track selected language for each input
-  const [lang1, setLang1] = useState("ru");
-  const [lang2, setLang2] = useState("en");
-  const [lang3, setLang3] = useState("de");
-
-  // Track text values for each textarea
-  const [text1, setText1] = useState("");
-  const [text2, setText2] = useState("");
-  const [text3, setText3] = useState("");
-
-  // Track structured translations for each field
-  const [translations1, setTranslations1] = useState<[string, string, string][] | null>(null);
-  const [translations2, setTranslations2] = useState<[string, string, string][] | null>(null);
-  const [translations3, setTranslations3] = useState<[string, string, string][] | null>(null);
-
-  // Track which field was last edited (determines source language)
-  const [sourceField, setSourceField] = useState<1 | 2 | 3 | null>(null);
+  // Array-based state for dynamic language fields
+  const [fields, setFields] = useState<LanguageField[]>([]);
+  const [sourceFieldId, setSourceFieldId] = useState<string | null>(null);
+  const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
 
   // Track translation state
   const [translating, setTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
-
-  // Track copied state
-  const [copiedField, setCopiedField] = useState<1 | 2 | 3 | null>(null);
-
-  // Spelling suggestion state
-  const [spellingSuggestion1, setSpellingSuggestion1] = useState<string | null>(null);
-  const [spellingSuggestion2, setSpellingSuggestion2] = useState<string | null>(null);
-  const [spellingSuggestion3, setSpellingSuggestion3] = useState<string | null>(null);
 
   // Quiz state
   const [showQuiz, setShowQuiz] = useState(false);
@@ -98,27 +86,40 @@ export default function Translate() {
   useEffect(() => {
     if (languages.length === 0) return;
 
-    const popularLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko"];
-    const browserLangCode = getBrowserLanguage();
-
     if (user && user.primary_language_code && user.translator_languages) {
-      const primaryLang = user.primary_language_code;
-      const translatorLangs = user.translator_languages.filter(
-        (lang: string) => lang !== primaryLang
-      );
+      // Build fields: primary + all translator languages
+      const allLangCodes = [
+        user.primary_language_code,
+        ...user.translator_languages
+      ];
 
-      setLang1(primaryLang);
-      setLang2(translatorLangs[0] || "en");
-      setLang3(translatorLangs[1] || "de");
+      const initialFields = allLangCodes.map((code, index) => ({
+        id: `field-${index}`,
+        languageCode: code,
+        text: "",
+        translations: null,
+        spellingSuggestion: null
+      }));
+
+      setFields(initialFields);
     } else {
-      const primaryLang = browserLangCode;
+      // Guest users: default to 3 languages
+      const browserLangCode = getBrowserLanguage();
+      const popularLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko"];
       const otherLangs = popularLanguages.filter(
-        lang => lang !== primaryLang && languages.some(l => l.code === lang)
+        lang => lang !== browserLangCode && languages.some(l => l.code === lang)
       );
 
-      setLang1(primaryLang);
-      setLang2(otherLangs[0] || "es");
-      setLang3(otherLangs[1] || "de");
+      const guestLangs = [browserLangCode, otherLangs[0] || "es", otherLangs[1] || "de"];
+      const guestFields = guestLangs.map((code, index) => ({
+        id: `field-${index}`,
+        languageCode: code,
+        text: "",
+        translations: null,
+        spellingSuggestion: null
+      }));
+
+      setFields(guestFields);
     }
   }, [languages, user]);
 
@@ -188,34 +189,31 @@ export default function Translate() {
   };
 
   // Handle spelling suggestion click
-  const handleSpellingSuggestionClick = (fieldNumber: 1 | 2 | 3, correctWord: string) => {
-    // Clear spelling suggestions
-    setSpellingSuggestion1(null);
-    setSpellingSuggestion2(null);
-    setSpellingSuggestion3(null);
+  const handleSpellingSuggestionClick = (fieldId: string, correctWord: string) => {
+    // Clear all spelling suggestions and update text
+    setFields(prev => prev.map(f =>
+      f.id === fieldId
+        ? { ...f, text: correctWord, spellingSuggestion: null }
+        : { ...f, spellingSuggestion: null }
+    ));
 
-    // Update the text field with correct word
-    if (fieldNumber === 1) setText1(correctWord);
-    else if (fieldNumber === 2) setText2(correctWord);
-    else setText3(correctWord);
+    setSourceFieldId(fieldId);
 
     // Trigger translation with the correct word
-    setSourceField(fieldNumber);
+    const sourceField = fields.find(f => f.id === fieldId);
+    if (!sourceField) return;
 
-    // Call translation directly
-    const sourceLang = fieldNumber === 1 ? lang1 : fieldNumber === 2 ? lang2 : lang3;
-    const targetLangs =
-      fieldNumber === 1
-        ? [lang2, lang3]
-        : fieldNumber === 2
-        ? [lang1, lang3]
-        : [lang1, lang2];
+    const targetLangs = fields
+      .filter(f => f.id !== fieldId)
+      .map(f => f.languageCode);
 
-    translateText(correctWord, sourceLang, targetLangs).then(result => {
+    translateText(correctWord, sourceField.languageCode, targetLangs).then(result => {
       if (result && !result.spellingIssue) {
         const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
 
+        const otherFields = fields.filter(f => f.id !== fieldId);
         const targetLangNames = targetLangs.map(getLanguageName);
+
         const translatedTexts = targetLangNames.map((langName) => {
           const translation = translations[langName];
           if (!translation || !Array.isArray(translation) || translation.length === 0) return "";
@@ -223,31 +221,23 @@ export default function Translate() {
         });
 
         const structuredTranslations = targetLangNames.map((langName) => {
-          const translation = translations[langName];
-          return translation || [];
+          return translations[langName] || [];
         });
 
         const sourceInfoArray = source_info ? [source_info] : null;
 
-        if (fieldNumber === 1) {
-          setText2(translatedTexts[0]);
-          setText3(translatedTexts[1]);
-          setTranslations1(sourceInfoArray);
-          setTranslations2(structuredTranslations[0]);
-          setTranslations3(structuredTranslations[1]);
-        } else if (fieldNumber === 2) {
-          setText1(translatedTexts[0]);
-          setText3(translatedTexts[1]);
-          setTranslations1(structuredTranslations[0]);
-          setTranslations2(sourceInfoArray);
-          setTranslations3(structuredTranslations[1]);
-        } else {
-          setText1(translatedTexts[0]);
-          setText2(translatedTexts[1]);
-          setTranslations1(structuredTranslations[0]);
-          setTranslations2(structuredTranslations[1]);
-          setTranslations3(sourceInfoArray);
-        }
+        setFields(prev => prev.map(f => {
+          if (f.id === fieldId) {
+            return { ...f, translations: sourceInfoArray };
+          } else {
+            const index = otherFields.findIndex(of => of.id === f.id);
+            return {
+              ...f,
+              text: translatedTexts[index] || "",
+              translations: structuredTranslations[index] || null
+            };
+          }
+        }));
 
         if (user && shouldShowQuiz && quizPhraseId) {
           setTimeout(() => {
@@ -259,77 +249,54 @@ export default function Translate() {
   };
 
   // Handle text change with debouncing
-  const handleTextChange = (
-    fieldNumber: 1 | 2 | 3,
-    value: string
-  ) => {
-    if (fieldNumber === 1) setText1(value);
-    else if (fieldNumber === 2) setText2(value);
-    else setText3(value);
+  const handleTextChange = (fieldId: string, value: string) => {
+    // Update the specific field and clear all spelling suggestions
+    setFields(prev => prev.map(f =>
+      f.id === fieldId
+        ? { ...f, text: value, translations: null, spellingSuggestion: null }
+        : { ...f, spellingSuggestion: null }
+    ));
 
-    if (fieldNumber === 1) setTranslations1(null);
-    else if (fieldNumber === 2) setTranslations2(null);
-    else setTranslations3(null);
-
-    // Clear ALL spelling suggestions when any input changes
-    setSpellingSuggestion1(null);
-    setSpellingSuggestion2(null);
-    setSpellingSuggestion3(null);
-
-    setSourceField(fieldNumber);
+    setSourceFieldId(fieldId);
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     if (!value.trim()) {
-      if (fieldNumber === 1) {
-        setText2("");
-        setText3("");
-      } else if (fieldNumber === 2) {
-        setText1("");
-        setText3("");
-      } else {
-        setText1("");
-        setText2("");
-      }
+      // Clear all other fields
+      setFields(prev => prev.map(f => ({ ...f, text: "" })));
       return;
     }
 
     debounceTimerRef.current = setTimeout(async () => {
-      const sourceLang = fieldNumber === 1 ? lang1 : fieldNumber === 2 ? lang2 : lang3;
-      const targetLangs =
-        fieldNumber === 1
-          ? [lang2, lang3]
-          : fieldNumber === 2
-          ? [lang1, lang3]
-          : [lang1, lang2];
+      const sourceField = fields.find(f => f.id === fieldId);
+      if (!sourceField) return;
 
-      const result = await translateText(value, sourceLang, targetLangs);
+      // Get all other languages as targets
+      const targetLangs = fields
+        .filter(f => f.id !== fieldId)
+        .map(f => f.languageCode);
+
+      const result = await translateText(value, sourceField.languageCode, targetLangs);
 
       if (result) {
-        // Check for spelling issue
+        // Handle spelling issue
         if (result.spellingIssue) {
-          // Set spelling suggestion for the source field
-          if (fieldNumber === 1) {
-            setSpellingSuggestion1(result.correctWord);
-            setSpellingSuggestion2(null);
-            setSpellingSuggestion3(null);
-          } else if (fieldNumber === 2) {
-            setSpellingSuggestion1(null);
-            setSpellingSuggestion2(result.correctWord);
-            setSpellingSuggestion3(null);
-          } else {
-            setSpellingSuggestion1(null);
-            setSpellingSuggestion2(null);
-            setSpellingSuggestion3(result.correctWord);
-          }
+          setFields(prev => prev.map(f =>
+            f.id === fieldId
+              ? { ...f, spellingSuggestion: result.correctWord }
+              : { ...f, spellingSuggestion: null }
+          ));
           return;
         }
 
         const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
 
+        // Distribute translations to all fields
+        const otherFields = fields.filter(f => f.id !== fieldId);
         const targetLangNames = targetLangs.map(getLanguageName);
+
         const translatedTexts = targetLangNames.map((langName) => {
           const translation = translations[langName];
           if (!translation || !Array.isArray(translation) || translation.length === 0) return "";
@@ -337,84 +304,71 @@ export default function Translate() {
         });
 
         const structuredTranslations = targetLangNames.map((langName) => {
-          const translation = translations[langName];
-          return translation || [];
+          return translations[langName] || [];
         });
 
         const sourceInfoArray = source_info ? [source_info] : null;
 
-        if (fieldNumber === 1) {
-          setText2(translatedTexts[0]);
-          setText3(translatedTexts[1]);
-          setTranslations1(sourceInfoArray);
-          setTranslations2(structuredTranslations[0]);
-          setTranslations3(structuredTranslations[1]);
-        } else if (fieldNumber === 2) {
-          setText1(translatedTexts[0]);
-          setText3(translatedTexts[1]);
-          setTranslations1(structuredTranslations[0]);
-          setTranslations2(sourceInfoArray);
-          setTranslations3(structuredTranslations[1]);
-        } else {
-          setText1(translatedTexts[0]);
-          setText2(translatedTexts[1]);
-          setTranslations1(structuredTranslations[0]);
-          setTranslations2(structuredTranslations[1]);
-          setTranslations3(sourceInfoArray);
-        }
+        setFields(prev => prev.map(f => {
+          if (f.id === fieldId) {
+            return { ...f, translations: sourceInfoArray };
+          } else {
+            const index = otherFields.findIndex(of => of.id === f.id);
+            return {
+              ...f,
+              text: translatedTexts[index] || "",
+              translations: structuredTranslations[index] || null
+            };
+          }
+        }));
 
         // Trigger quiz after delay if needed (only for logged-in users)
-        console.log('Quiz trigger check:', {
-          user: !!user,
-          shouldShowQuiz,
-          quizPhraseId,
-          willTrigger: !!(user && shouldShowQuiz && quizPhraseId)
-        });
-
         if (user && shouldShowQuiz && quizPhraseId) {
-          console.log('Setting quiz timeout...');
           setTimeout(() => {
-            console.log('Fetching quiz now for phrase:', quizPhraseId);
             fetchAndShowQuiz(quizPhraseId);
-          }, 2500); // 2.5 second delay
+          }, 2500);
         }
       }
     }, 1000);
   };
 
   // Clear field function
-  const clearField = (fieldNumber: 1 | 2 | 3) => {
-    setText1("");
-    setText2("");
-    setText3("");
-    setTranslations1(null);
-    setTranslations2(null);
-    setTranslations3(null);
-    setSourceField(null);
+  const clearField = () => {
+    // Clear ALL fields (maintains current behavior)
+    setFields(prev => prev.map(f => ({
+      ...f,
+      text: "",
+      translations: null,
+      spellingSuggestion: null
+    })));
+    setSourceFieldId(null);
     setTranslationError(null);
-
-    // Clear all spelling suggestions when clearing
-    setSpellingSuggestion1(null);
-    setSpellingSuggestion2(null);
-    setSpellingSuggestion3(null);
   };
 
   // Copy field function
-  const copyField = async (fieldNumber: 1 | 2 | 3) => {
-    const text = fieldNumber === 1 ? text1 : fieldNumber === 2 ? text2 : text3;
-
-    if (!text) return;
+  const copyField = async (fieldId: string) => {
+    const field = fields.find(f => f.id === fieldId);
+    if (!field?.text) return;
 
     try {
-      await navigator.clipboard.writeText(text);
-      setCopiedField(fieldNumber);
+      await navigator.clipboard.writeText(field.text);
+      setCopiedFieldId(fieldId);
 
       setTimeout(() => {
-        setCopiedField(null);
+        setCopiedFieldId(null);
       }, 2000);
     } catch (err) {
       console.error("Failed to copy text:", err);
     }
+  };
+
+  // Handle language change (guest users only)
+  const handleLanguageChange = (fieldId: string, newLanguageCode: string) => {
+    setFields(prev => prev.map(f =>
+      f.id === fieldId
+        ? { ...f, languageCode: newLanguageCode }
+        : f
+    ));
   };
 
   // Fetch and show quiz from backend
@@ -599,115 +553,63 @@ export default function Translate() {
 
       {/* Main Content */}
       <main className="w-full pt-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className={cn(
+          "grid gap-6 md:gap-8",
+          fields.length === 2 ? "grid-cols-1 md:grid-cols-2" :
+          "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        )}>
           {/* Language selector for non-authenticated users */}
-          {!user && (
-            <>
-              <Select value={lang1} onValueChange={setLang1} disabled={languagesLoading}>
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {languagesError ? (
-                    <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                  ) : (
-                    languages.map((lang) => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.en_name} ({lang.original_name})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-
-              <Select value={lang2} onValueChange={setLang2} disabled={languagesLoading}>
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {languagesError ? (
-                    <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                  ) : (
-                    languages.map((lang) => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.en_name} ({lang.original_name})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-
-              <Select value={lang3} onValueChange={setLang3} disabled={languagesLoading}>
-                <SelectTrigger className="h-9 bg-background">
-                  <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {languagesError ? (
-                    <SelectItem value="error" disabled>Error loading languages</SelectItem>
-                  ) : (
-                    languages.map((lang) => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.en_name} ({lang.original_name})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </>
-          )}
+          {!user && fields.map((field) => (
+            <Select
+              key={field.id}
+              value={field.languageCode}
+              onValueChange={(value) => handleLanguageChange(field.id, value)}
+              disabled={languagesLoading}
+            >
+              <SelectTrigger className="h-9 bg-background">
+                <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
+              </SelectTrigger>
+              <SelectContent>
+                {languagesError ? (
+                  <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                ) : (
+                  languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.en_name} ({lang.original_name})
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mt-6">
-          {/* First Input */}
-          <LanguageInput
-            languageName={getLanguageName(lang1)}
-            value={text1}
-            onChange={(value) => handleTextChange(1, value)}
-            onClear={() => clearField(1)}
-            onCopy={() => copyField(1)}
-            isSource={sourceField === 1}
-            isTranslating={translating}
-            isCopied={copiedField === 1}
-            placeholder={`Enter text in ${getLanguageName(lang1)}`}
-            spellingSuggestion={spellingSuggestion1}
-            onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(1, correction)}
-            translations={translations1}
-            showLanguageName={!!user}
-          />
-
-          {/* Second Input */}
-          <LanguageInput
-            languageName={getLanguageName(lang2)}
-            value={text2}
-            onChange={(value) => handleTextChange(2, value)}
-            onClear={() => clearField(2)}
-            onCopy={() => copyField(2)}
-            isSource={sourceField === 2}
-            isTranslating={translating}
-            isCopied={copiedField === 2}
-            placeholder={`Enter text in ${getLanguageName(lang2)}`}
-            spellingSuggestion={spellingSuggestion2}
-            onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(2, correction)}
-            translations={translations2}
-            showLanguageName={!!user}
-          />
-
-          {/* Third Input */}
-          <LanguageInput
-            languageName={getLanguageName(lang3)}
-            value={text3}
-            onChange={(value) => handleTextChange(3, value)}
-            onClear={() => clearField(3)}
-            onCopy={() => copyField(3)}
-            isSource={sourceField === 3}
-            isTranslating={translating}
-            isCopied={copiedField === 3}
-            placeholder={`Enter text in ${getLanguageName(lang3)}`}
-            spellingSuggestion={spellingSuggestion3}
-            onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(3, correction)}
-            translations={translations3}
-            showLanguageName={!!user}
-          />
+        <div className={cn(
+          "grid gap-6 md:gap-8 mt-6",
+          fields.length === 2 ? "grid-cols-1 md:grid-cols-2" :
+          "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        )}>
+          {fields.map((field) => (
+            <LanguageInput
+              key={field.id}
+              languageName={getLanguageName(field.languageCode)}
+              languageCode={field.languageCode}
+              value={field.text}
+              onChange={(value) => handleTextChange(field.id, value)}
+              onClear={clearField}
+              onCopy={() => copyField(field.id)}
+              isSource={sourceFieldId === field.id}
+              isTranslating={translating}
+              isCopied={copiedFieldId === field.id}
+              placeholder={`Enter text in ${getLanguageName(field.languageCode)}`}
+              spellingSuggestion={field.spellingSuggestion}
+              onSpellingSuggestionClick={(correction) =>
+                handleSpellingSuggestionClick(field.id, correction)
+              }
+              translations={field.translations}
+              showLanguageName={!!user}
+            />
+          ))}
         </div>
 
         {/* Error Message */}
