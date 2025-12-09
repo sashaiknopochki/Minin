@@ -645,6 +645,66 @@ export default function Translate() {
         </section>
       )}
 
+      {/* Quiz Cards section - Only for logged-out users */}
+      {!user && (
+        <section className="w-full py-16 mt-16">
+          <h2 className="text-4xl font-medium text-left mb-12">Try sample quizzes</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            {/* Beginner Quiz Card */}
+            <div className="flex flex-col text-left gap-4 p-6 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Beginner</span>
+                <span className="text-sm text-muted-foreground">Multiple Choice</span>
+              </div>
+              <h3 className="text-xl font-semibold mt-2">What does "Katze" mean in English?</h3>
+              <div className="flex flex-col gap-2 mt-2">
+                <div className="p-3 rounded-md border border-border hover:bg-muted/50 cursor-pointer transition-colors">
+                  A) Dog
+                </div>
+                <div className="p-3 rounded-md border border-border hover:bg-muted/50 cursor-pointer transition-colors">
+                  B) Cat
+                </div>
+                <div className="p-3 rounded-md border border-border hover:bg-muted/50 cursor-pointer transition-colors">
+                  C) Bird
+                </div>
+                <div className="p-3 rounded-md border border-border hover:bg-muted/50 cursor-pointer transition-colors">
+                  D) Fish
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Master basic vocabulary with simple recognition quizzes
+              </p>
+            </div>
+
+            {/* Intermediate Quiz Card */}
+            <div className="flex flex-col text-left gap-4 p-6 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">Intermediate</span>
+                <span className="text-sm text-muted-foreground">Fill in the Blank</span>
+              </div>
+              <h3 className="text-xl font-semibold mt-2">Complete the sentence:</h3>
+              <div className="flex flex-col gap-3 mt-2">
+                <p className="text-lg">Ich _____ gerne Bücher.</p>
+                <p className="text-sm text-muted-foreground italic">(I like to read books)</p>
+                <div className="p-3 rounded-md border border-border bg-muted/30">
+                  <input
+                    type="text"
+                    placeholder="Type your answer..."
+                    className="w-full bg-transparent outline-none"
+                    disabled
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Practice active recall with context-based questions
+              </p>
+            </div>
+
+          </div>
+        </section>
+      )}
+
       {/* Problems it solves section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
