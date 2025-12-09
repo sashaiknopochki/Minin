@@ -5,7 +5,7 @@ Temporary test script to verify structured output vs JSON mode
 
 import sys
 import logging
-from Minin.services.llm_translation_service import translate_text, GPT_4_1_MINI, O4_MINI
+from services.llm_translation_service import translate_text, GPT_4_1_MINI, O4_MINI
 
 # Configure logging to show in terminal
 logging.basicConfig(

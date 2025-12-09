@@ -202,7 +202,7 @@ export default function Practice() {
       <h1 className="text-4xl font-bold mb-8 text-left">Practice</h1>
 
       {/* Filters Section */}
-      <div className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div className="mb-16 flex flex-wrap items-center gap-x-8 gap-y-4">
         {/* Language Filter */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground mr-2">

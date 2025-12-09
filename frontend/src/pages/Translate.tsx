@@ -654,7 +654,7 @@ export default function Translate() {
             {/* Beginner Quiz Card */}
             <div className="flex flex-col text-left gap-4 p-6 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full">Beginner</span>
+                <span className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">Beginner</span>
                 <span className="text-sm text-muted-foreground">Multiple Choice</span>
               </div>
               <h3 className="text-xl font-semibold mt-2">What does "Katze" mean in English?</h3>
@@ -680,7 +680,7 @@ export default function Translate() {
             {/* Intermediate Quiz Card */}
             <div className="flex flex-col text-left gap-4 p-6 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="px-3 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded-full">Intermediate</span>
+                <span className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">Intermediate</span>
                 <span className="text-sm text-muted-foreground">Fill in the Blank</span>
               </div>
               <h3 className="text-xl font-semibold mt-2">Complete the sentence:</h3>

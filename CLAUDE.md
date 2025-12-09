@@ -127,7 +127,7 @@ python test_models.py
 Minin/
 ├── app.py                          # Flask application factory
 ├── config.py                       # Environment-based configuration
-├── test_models.py                  # Model integration tests
+├── conftest.py                     # Pytest configuration
 ├── models/
 │   ├── __init__.py                # SQLAlchemy db initialization
 │   ├── user.py                    # User model with OAuth fields
@@ -140,14 +140,50 @@ Minin/
 │   └── session.py                 # Search session grouping
 ├── routes/
 │   ├── __init__.py
-│   ├── auth.py                    # Authentication endpoints
+│   ├── api.py                     # Core API endpoints
 │   ├── translation.py             # Translation endpoints
 │   ├── quiz.py                    # Quiz endpoints
 │   ├── progress.py                # Learning progress endpoints
 │   └── settings.py                # User settings endpoints
-├── schema.sql                     # DBML schema documentation
-├── endpoints.md                   # API endpoint specifications
-└── README.md                      # Full project documentation
+├── services/                       # Business logic (10 services)
+│   ├── llm_translation_service.py
+│   ├── phrase_translation_service.py
+│   ├── question_generation_service.py
+│   ├── answer_evaluation_service.py
+│   ├── learning_progress_service.py
+│   ├── quiz_attempt_service.py
+│   ├── quiz_trigger_service.py
+│   ├── user_search_service.py
+│   ├── session_service.py
+│   └── language_utils.py
+├── auth/                           # Authentication
+│   ├── oauth.py
+│   └── utils.py
+├── tests/                          # Test suite (16 test files)
+│   ├── test_models.py
+│   ├── test_auth.py
+│   ├── test_translation.py
+│   ├── test_spell_check.py
+│   └── ... (12 more test files)
+├── scripts/                        # Utility scripts
+│   ├── README.md                  # Script documentation
+│   ├── populate_languages.py      # Language table setup
+│   ├── backup_db.py               # Database backup
+│   ├── check_db.py                # Database health check
+│   ├── debug_quiz_data.py         # Quiz debugging
+│   ├── demo_caching_workflow.py   # Caching demo
+│   └── watch_logs.sh              # Log monitoring
+├── docs/                           # Documentation (20+ guides)
+│   ├── README.md                  # Documentation index
+│   ├── schema.sql                 # DBML schema documentation
+│   ├── API_ENDPOINTS.md           # API endpoint specifications
+│   ├── AGENTS.md                  # Agent workflow
+│   ├── CACHING_IMPLEMENTATION.md
+│   └── ... (implementation guides)
+├── migrations/                     # Database migrations
+│   └── versions/
+└── frontend/                       # React application
+    └── src/
 ```
 
 ## Important Implementation Notes

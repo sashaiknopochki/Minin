@@ -216,6 +216,19 @@ migrations/versions/*.py
 .env.local
 .env.*.local
 
+# OAuth and sensitive credentials
+client_secret_*.json
+*.pem
+*.key
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node modules
+node_modules/
+
 # IDE
 .vscode/
 .idea/

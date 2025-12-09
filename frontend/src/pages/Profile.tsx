@@ -171,7 +171,7 @@ export default function Profile() {
     <div className="w-full py-8">
       <h1 className="text-4xl font-bold mb-8 text-left">Profile</h1>
 
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-3xl mx-auto">
         {/* Learning Section */}
         <section>
           <Card>
