@@ -8,6 +8,9 @@ export interface User {
   primary_language_code: string;
   translator_languages: string[];
   quiz_frequency: number;
+  enable_contextual_quiz: boolean;
+  enable_definition_quiz: boolean;
+  enable_synonym_quiz: boolean;
 }
 
 interface AuthContextType {

@@ -27,6 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import LanguageManager from "@/components/LanguageManager";
 
 export default function Profile() {
@@ -38,6 +41,18 @@ export default function Profile() {
     user?.quiz_frequency ?? 5
   );
   const [isUpdatingFrequency, setIsUpdatingFrequency] = useState(false);
+
+  // Quiz type preferences state
+  const [enableContextualQuiz, setEnableContextualQuiz] = useState<boolean>(
+    user?.enable_contextual_quiz ?? true
+  );
+  const [enableDefinitionQuiz, setEnableDefinitionQuiz] = useState<boolean>(
+    user?.enable_definition_quiz ?? true
+  );
+  const [enableSynonymQuiz, setEnableSynonymQuiz] = useState<boolean>(
+    user?.enable_synonym_quiz ?? true
+  );
+  const [isUpdatingQuizPreferences, setIsUpdatingQuizPreferences] = useState(false);
 
   const handleQuizFrequencyChange = async (value: string) => {
     const newFrequency = parseInt(value);
@@ -69,6 +84,43 @@ export default function Profile() {
       setQuizFrequency(user?.quiz_frequency ?? 5);
     } finally {
       setIsUpdatingFrequency(false);
+    }
+  };
+
+  const handleQuizPreferenceChange = async (
+    preferenceKey: string,
+    newValue: boolean,
+    setterFunction: React.Dispatch<React.SetStateAction<boolean>>,
+    previousValue: boolean
+  ) => {
+    setterFunction(newValue);
+    setIsUpdatingQuizPreferences(true);
+
+    try {
+      const response = await fetch("/settings/quiz-preferences", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ [preferenceKey]: newValue }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error("Failed to update quiz preference:", data.error);
+        alert("Failed to update quiz preference. Please try again.");
+        // Revert to previous value if update failed
+        setterFunction(previousValue);
+      }
+    } catch (error) {
+      console.error("Error updating quiz preference:", error);
+      alert("An error occurred while updating quiz preference. Please try again.");
+      // Revert to previous value if update failed
+      setterFunction(previousValue);
+    } finally {
+      setIsUpdatingQuizPreferences(false);
     }
   };
 
@@ -130,6 +182,7 @@ export default function Profile() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Quiz Frequency Setting */}
               <div className="flex items-center gap-3 text-left">
                 <p className="text-foreground">
                   Show quizzes about previously searched words every
@@ -150,6 +203,103 @@ export default function Profile() {
                   </SelectContent>
                 </Select>
                 <p className="text-foreground">translations.</p>
+              </div>
+
+              <Separator />
+
+              {/* Quiz Type Preferences Section */}
+              <div className="space-y-4">
+                <div className="text-left">
+                  <h3 className="text-sm font-semibold">Advanced Question Types</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Choose which types of advanced questions to include in your practice.
+                    Basic and intermediate questions cannot be disabled.
+                  </p>
+                </div>
+
+                {/* Contextual Questions Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 text-left">
+                    <Label htmlFor="contextual" className="text-sm font-medium">
+                      Contextual Questions
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Translate words within sentence context
+                    </p>
+                  </div>
+                  <Switch
+                    id="contextual"
+                    checked={enableContextualQuiz}
+                    onCheckedChange={(checked) =>
+                      handleQuizPreferenceChange(
+                        "enable_contextual_quiz",
+                        checked,
+                        setEnableContextualQuiz,
+                        enableContextualQuiz
+                      )
+                    }
+                    disabled={isUpdatingQuizPreferences}
+                  />
+                </div>
+
+                {/* Definition Questions Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 text-left">
+                    <Label htmlFor="definition" className="text-sm font-medium">
+                      Definition Questions
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Match words to their definitions
+                    </p>
+                  </div>
+                  <Switch
+                    id="definition"
+                    checked={enableDefinitionQuiz}
+                    onCheckedChange={(checked) =>
+                      handleQuizPreferenceChange(
+                        "enable_definition_quiz",
+                        checked,
+                        setEnableDefinitionQuiz,
+                        enableDefinitionQuiz
+                      )
+                    }
+                    disabled={isUpdatingQuizPreferences}
+                  />
+                </div>
+
+                {/* Synonym Questions Toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 text-left">
+                    <Label htmlFor="synonym" className="text-sm font-medium">
+                      Synonym Questions
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Identify synonyms and related words
+                    </p>
+                  </div>
+                  <Switch
+                    id="synonym"
+                    checked={enableSynonymQuiz}
+                    onCheckedChange={(checked) =>
+                      handleQuizPreferenceChange(
+                        "enable_synonym_quiz",
+                        checked,
+                        setEnableSynonymQuiz,
+                        enableSynonymQuiz
+                      )
+                    }
+                    disabled={isUpdatingQuizPreferences}
+                  />
+                </div>
+
+                {/* Info Note */}
+                <div className="rounded-lg bg-muted p-3 text-left">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Note:</strong> If all advanced question types are disabled,
+                    the system will automatically enable them all to ensure you can still
+                    progress to the advanced learning stage.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

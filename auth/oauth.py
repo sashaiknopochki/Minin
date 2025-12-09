@@ -218,7 +218,10 @@ def get_current_user():
                 'name': current_user.name,
                 'primary_language_code': current_user.primary_language_code,
                 'translator_languages': current_user.translator_languages,
-                'quiz_frequency': current_user.quiz_frequency
+                'quiz_frequency': current_user.quiz_frequency,
+                'enable_contextual_quiz': current_user.enable_contextual_quiz,
+                'enable_definition_quiz': current_user.enable_definition_quiz,
+                'enable_synonym_quiz': current_user.enable_synonym_quiz
             }
         }), 200
     else:

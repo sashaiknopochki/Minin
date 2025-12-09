@@ -29,6 +29,11 @@ class User(UserMixin, db.Model):
     quiz_mode_enabled = db.Column(db.Boolean, default=True)
     searches_since_last_quiz = db.Column(db.Integer, default=0)
 
+    # Quiz type preferences (advanced stage only)
+    enable_contextual_quiz = db.Column(db.Boolean, default=True)
+    enable_definition_quiz = db.Column(db.Boolean, default=True)
+    enable_synonym_quiz = db.Column(db.Boolean, default=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_active_at = db.Column(db.DateTime)
 

@@ -73,6 +73,72 @@ def update_quiz_frequency():
         }), 500
 
 
+@bp.route('/quiz-preferences', methods=['PATCH'])
+@login_required
+def update_quiz_preferences():
+    """
+    Update the user's quiz type preferences.
+
+    This controls which advanced quiz types are enabled for the user.
+
+    Request Body:
+        {
+            "enable_contextual_quiz": bool (optional),
+            "enable_definition_quiz": bool (optional),
+            "enable_synonym_quiz": bool (optional)
+        }
+
+    Returns:
+        JSON response with success status and updated preferences
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing request body'
+            }), 400
+
+        updated_fields = {}
+
+        # Update each preference if provided
+        if 'enable_contextual_quiz' in data:
+            current_user.enable_contextual_quiz = bool(data['enable_contextual_quiz'])
+            updated_fields['enable_contextual_quiz'] = current_user.enable_contextual_quiz
+
+        if 'enable_definition_quiz' in data:
+            current_user.enable_definition_quiz = bool(data['enable_definition_quiz'])
+            updated_fields['enable_definition_quiz'] = current_user.enable_definition_quiz
+
+        if 'enable_synonym_quiz' in data:
+            current_user.enable_synonym_quiz = bool(data['enable_synonym_quiz'])
+            updated_fields['enable_synonym_quiz'] = current_user.enable_synonym_quiz
+
+        if not updated_fields:
+            return jsonify({
+                'success': False,
+                'error': 'No valid quiz preferences provided'
+            }), 400
+
+        db.session.commit()
+
+        logger.info(f'Updated quiz preferences for user {current_user.email}: {updated_fields}')
+
+        return jsonify({
+            'success': True,
+            'updated_preferences': updated_fields
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f'Error updating quiz preferences for user {current_user.email}: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': 'Failed to update quiz preferences. Please try again.'
+        }), 500
+
+
 @bp.route('/account', methods=['DELETE'])
 @login_required
 def delete_account():
