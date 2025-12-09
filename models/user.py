@@ -17,8 +17,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String, nullable=False, index=True)
     name = db.Column(db.String)
 
-    # Language for quiz responses
-    primary_language_code = db.Column(db.String(2), db.ForeignKey('languages.code'))
+    # Language for quiz responses (supports extended codes like zh-CN)
+    primary_language_code = db.Column(db.String(10), db.ForeignKey('languages.code'))
 
     # Array of language codes e.g. ["en", "de", "ru"]
     translator_languages = db.Column(db.JSON)
@@ -62,8 +62,9 @@ class User(UserMixin, db.Model):
         if not isinstance(languages, list):
             raise ValueError('translator_languages must be a list')
         for lang in languages:
-            if not isinstance(lang, str) or len(lang) != 2:
-                raise ValueError(f'Invalid language code: {lang}. Must be 2-character ISO code')
+            # Allow codes up to 10 characters (supports extended codes like zh-CN, zh-TW)
+            if not isinstance(lang, str) or len(lang) < 2 or len(lang) > 10:
+                raise ValueError(f'Invalid language code: {lang}. Must be 2-10 characters')
         return languages
 
     def __repr__(self):

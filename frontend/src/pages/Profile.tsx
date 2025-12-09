@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import LanguageManager from "@/components/LanguageManager";
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -160,13 +161,11 @@ export default function Profile() {
             <CardHeader>
               <CardTitle className="text-left">Languages</CardTitle>
               <CardDescription className="text-left">
-                Change the sequence of your languages at the Translate page.
+                Manage your primary language and learning languages.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground text-left">
-                Configure your primary language and translation targets here.
-              </p>
+              <LanguageManager />
             </CardContent>
           </Card>
         </section>
