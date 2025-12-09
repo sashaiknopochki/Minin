@@ -439,11 +439,12 @@ with AI-powered quizzes increasing active vocabulary.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {/* First Input */}
           <div className="flex flex-col gap-6">
-            {user ? (
+            {user && (
               <div className="text-base font-medium text-left">
                 {getLanguageName(lang1)}
               </div>
-            ) : (
+            )}
+            {!user && (
               <Select value={lang1} onValueChange={setLang1} disabled={languagesLoading}>
                 <SelectTrigger className="h-9 bg-background">
                   <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
@@ -517,11 +518,12 @@ with AI-powered quizzes increasing active vocabulary.</p>
 
           {/* Second Input */}
           <div className="flex flex-col gap-6">
-            {user ? (
+            {user && (
               <div className="text-base font-medium text-left">
                 {getLanguageName(lang2)}
               </div>
-            ) : (
+            )}
+            {!user && (
               <Select value={lang2} onValueChange={setLang2} disabled={languagesLoading}>
                 <SelectTrigger className="h-9 bg-background">
                   <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
@@ -595,11 +597,12 @@ with AI-powered quizzes increasing active vocabulary.</p>
 
           {/* Third Input */}
           <div className="flex flex-col gap-6">
-            {user ? (
+            {user && (
               <div className="text-base font-medium text-left">
                 {getLanguageName(lang3)}
               </div>
-            ) : (
+            )}
+            {!user && (
               <Select value={lang3} onValueChange={setLang3} disabled={languagesLoading}>
                 <SelectTrigger className="h-9 bg-background">
                   <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />

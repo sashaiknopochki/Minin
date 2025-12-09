@@ -311,7 +311,7 @@ export default function Profile() {
             <CardHeader>
               <CardTitle className="text-left">Languages</CardTitle>
               <CardDescription className="text-left">
-                Manage your primary language and learning languages.
+                Manage your primary language and learning languages. Reorder languages here to change the order of columns on the Translate page.
               </CardDescription>
             </CardHeader>
             <CardContent>

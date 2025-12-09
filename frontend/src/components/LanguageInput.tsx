@@ -14,6 +14,7 @@ interface LanguageInputProps {
   spellingSuggestion: string | null;
   onSpellingSuggestionClick: (correction: string) => void;
   translations: [string, string, string][] | null;
+  showLanguageName?: boolean; // Optional prop to control language name visibility
 }
 
 export function LanguageInput({
@@ -28,13 +29,16 @@ export function LanguageInput({
   placeholder,
   spellingSuggestion,
   onSpellingSuggestionClick,
-  translations
+  translations,
+  showLanguageName = true // Default to true for backward compatibility
 }: LanguageInputProps) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="text-base font-medium text-left">
-        {languageName}
-      </div>
+      {showLanguageName && (
+        <div className="text-base font-medium text-left">
+          {languageName}
+        </div>
+      )}
 
       <div className="relative">
         <Textarea

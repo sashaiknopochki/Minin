@@ -672,6 +672,7 @@ export default function Translate() {
             spellingSuggestion={spellingSuggestion1}
             onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(1, correction)}
             translations={translations1}
+            showLanguageName={!!user}
           />
 
           {/* Second Input */}
@@ -688,6 +689,7 @@ export default function Translate() {
             spellingSuggestion={spellingSuggestion2}
             onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(2, correction)}
             translations={translations2}
+            showLanguageName={!!user}
           />
 
           {/* Third Input */}
@@ -704,6 +706,7 @@ export default function Translate() {
             spellingSuggestion={spellingSuggestion3}
             onSpellingSuggestionClick={(correction) => handleSpellingSuggestionClick(3, correction)}
             translations={translations3}
+            showLanguageName={!!user}
           />
         </div>
 

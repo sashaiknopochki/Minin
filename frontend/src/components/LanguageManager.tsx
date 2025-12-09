@@ -244,7 +244,7 @@ export default function LanguageManager() {
     <div className="space-y-6 text-left">
       {/* Primary Language Section */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Primary Language</label>
+        <label className="text-sm font-medium">Native Language (used for all explanations and information)</label>
         <Popover open={primaryOpen} onOpenChange={setPrimaryOpen}>
           <PopoverTrigger asChild>
             <Button
