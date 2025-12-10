@@ -12,8 +12,7 @@ import time
 import random
 from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
-from openai import OpenAI
-from openai import APIError, APIConnectionError, RateLimitError, APITimeoutError
+from services.llm_provider_factory import get_llm_client, LLMProviderFactory
 
 from models import db
 from models.quiz_attempt import QuizAttempt
@@ -26,9 +25,11 @@ from models.language import Language
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Model constants
-GPT_4_1_MINI = "gpt-4.1-mini"
-DEFAULT_MODEL = GPT_4_1_MINI
+# Load environment variables
+load_dotenv()
+
+# Get default model based on configured provider
+DEFAULT_MODEL = LLMProviderFactory.get_default_model()
 
 # Retry configuration
 MAX_RETRIES = 3
@@ -157,7 +158,7 @@ class QuestionGenerationService:
                     native_language=user.primary_language_code,
                     context_sentence=context_sentence
                 )
-            except (APIError, APIConnectionError, RateLimitError, APITimeoutError, RuntimeError) as e:
+            except (RuntimeError, Exception) as e:
                 # LLM failed, use fallback
                 logger.warning(
                     f"LLM generation failed for quiz_attempt {quiz_attempt.id}: {str(e)}. "
@@ -239,22 +240,17 @@ class QuestionGenerationService:
             ValueError: If question_type is not supported
             RuntimeError: If API call fails
         """
-        # Load environment variables
-        load_dotenv()
-
-        # Get API key
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.error("OPENAI_API_KEY not found in environment variables")
-            raise RuntimeError("OPENAI_API_KEY not configured")
-
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
+        # Initialize LLM provider
+        try:
+            provider = get_llm_client()
+        except ValueError as e:
+            logger.error(f"Failed to initialize LLM provider: {str(e)}")
+            raise RuntimeError(f"LLM provider configuration error: {str(e)}")
 
         # Generate question based on type
         if question_type == 'multiple_choice_target':
             return QuestionGenerationService._generate_multiple_choice_target(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -263,7 +259,7 @@ class QuestionGenerationService:
 
         elif question_type == 'multiple_choice_source':
             return QuestionGenerationService._generate_multiple_choice_source(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -272,7 +268,7 @@ class QuestionGenerationService:
 
         elif question_type == 'text_input_target':
             return QuestionGenerationService._generate_text_input_target(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -281,7 +277,7 @@ class QuestionGenerationService:
 
         elif question_type == 'text_input_source':
             return QuestionGenerationService._generate_text_input_source(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -290,7 +286,7 @@ class QuestionGenerationService:
 
         elif question_type == 'contextual':
             return QuestionGenerationService._generate_contextual(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -300,7 +296,7 @@ class QuestionGenerationService:
 
         elif question_type == 'definition':
             return QuestionGenerationService._generate_definition(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -309,7 +305,7 @@ class QuestionGenerationService:
 
         elif question_type == 'synonym':
             return QuestionGenerationService._generate_synonym(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -343,7 +339,7 @@ class QuestionGenerationService:
 
     @staticmethod
     def _generate_multiple_choice_target(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -402,7 +398,7 @@ If multiple meanings exist, use this format:
 
         try:
             # Call OpenAI API with retry logic
-            content = QuestionGenerationService._call_api_with_retry(client, prompt)
+            content = QuestionGenerationService._call_api_with_retry(provider, prompt)
 
             # Parse JSON response
             result = json.loads(content)
@@ -449,7 +445,7 @@ If multiple meanings exist, use this format:
 
     @staticmethod
     def _generate_multiple_choice_source(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -511,7 +507,7 @@ Return format:
 
         try:
             # Call OpenAI API with retry logic
-            content = QuestionGenerationService._call_api_with_retry(client, prompt)
+            content = QuestionGenerationService._call_api_with_retry(provider, prompt)
 
             # Parse JSON response
             result = json.loads(content)
@@ -558,7 +554,7 @@ Return format:
 
     @staticmethod
     def _generate_text_input_target(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -570,7 +566,7 @@ Return format:
         User sees phrase in source language and types translation in their native language.
 
         Args:
-            client: OpenAI client instance
+            provider client instance
             phrase_text: The word/phrase to quiz on (e.g., "Katze")
             phrase_language: Language code of the phrase (e.g., "de")
             translations: Dict of translations by language name
@@ -635,7 +631,7 @@ If multiple meanings exist, use this format:
         # Call LLM with retry logic
         try:
             content = QuestionGenerationService._call_api_with_retry(
-                client=client,
+                provider=provider,
                 prompt=prompt,
                 system_message=system_message
             )
@@ -679,7 +675,7 @@ If multiple meanings exist, use this format:
 
     @staticmethod
     def _generate_text_input_source(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -692,7 +688,7 @@ If multiple meanings exist, use this format:
         This is more challenging as user must produce the foreign language word.
 
         Args:
-            client: OpenAI client instance
+            provider client instance
             phrase_text: The word/phrase in source language (e.g., "Katze")
             phrase_language: Language code of the phrase (e.g., "de")
             translations: Dict of translations by language name
@@ -776,7 +772,7 @@ Return format:
         # Call LLM with retry logic
         try:
             content = QuestionGenerationService._call_api_with_retry(
-                client=client,
+                provider=provider,
                 prompt=prompt,
                 system_message=system_message
             )
@@ -820,7 +816,7 @@ Return format:
 
     @staticmethod
     def _generate_contextual(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -834,7 +830,7 @@ Return format:
         for disambiguating words with multiple meanings.
 
         Args:
-            client: OpenAI client instance
+            provider client instance
             phrase_text: The word/phrase to quiz on (e.g., "Bank")
             phrase_language: Language code of the phrase (e.g., "de")
             translations: Dict of translations by language name
@@ -860,7 +856,7 @@ Return format:
                 f"Falling back to text_input_target."
             )
             return QuestionGenerationService._generate_text_input_target(
-                client=client,
+                provider=provider,
                 phrase_text=phrase_text,
                 phrase_language=phrase_language,
                 translations=translations,
@@ -908,7 +904,7 @@ Return format:
         # Call LLM with retry logic
         try:
             content = QuestionGenerationService._call_api_with_retry(
-                client=client,
+                provider=provider,
                 prompt=prompt,
                 system_message=system_message
             )
@@ -950,7 +946,7 @@ Return format:
 
     @staticmethod
     def _generate_definition(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -963,7 +959,7 @@ Return format:
         the word IN THE SOURCE LANGUAGE, not translate it. This tests deep understanding.
 
         Args:
-            client: OpenAI client instance
+            provider client instance
             phrase_text: The word/phrase to quiz on (e.g., "geben")
             phrase_language: Language code of the phrase (e.g., "de")
             translations: Dict of translations by language name
@@ -1023,7 +1019,7 @@ Example (for German word "geben"):
         # Call LLM with retry logic
         try:
             content = QuestionGenerationService._call_api_with_retry(
-                client=client,
+                provider=provider,
                 prompt=prompt,
                 system_message=system_message
             )
@@ -1072,7 +1068,7 @@ Example (for German word "geben"):
 
     @staticmethod
     def _generate_synonym(
-        client: OpenAI,
+        provider,
         phrase_text: str,
         phrase_language: str,
         translations: Dict[str, Any],
@@ -1085,7 +1081,7 @@ Example (for German word "geben"):
         The use of the word "synonym" makes it clear we want a word in the same language.
 
         Args:
-            client: OpenAI client instance
+            provider client instance
             phrase_text: The word/phrase to quiz on (e.g., "schön")
             phrase_language: Language code of the phrase (e.g., "de")
             translations: Dict of translations by language name
@@ -1147,7 +1143,7 @@ Example (for German word "schön"):
         # Call LLM with retry logic
         try:
             content = QuestionGenerationService._call_api_with_retry(
-                client=client,
+                provider=provider,
                 prompt=prompt,
                 system_message=system_message
             )
@@ -1354,7 +1350,7 @@ Example (for German word "schön"):
 
     @staticmethod
     def _call_api_with_retry(
-        client: OpenAI,
+        provider,
         prompt: str,
         system_message: str = "You are a language learning quiz generator. Return only valid JSON."
     ) -> str:
@@ -1362,7 +1358,7 @@ Example (for German word "schön"):
         Call OpenAI API with exponential backoff retry logic.
 
         Args:
-            client: OpenAI client instance
+            provider client instance
             prompt: The user prompt
             system_message: The system message
 
@@ -1378,8 +1374,7 @@ Example (for German word "schön"):
             try:
                 logger.debug(f"API call attempt {attempt}/{MAX_RETRIES}")
 
-                response = client.chat.completions.create(
-                    model=DEFAULT_MODEL,
+                response = provider.create_chat_completion(
                     messages=[
                         {"role": "system", "content": system_message},
                         {"role": "user", "content": prompt}
@@ -1389,41 +1384,31 @@ Example (for German word "schön"):
                     timeout=30.0  # 30 second timeout
                 )
 
-                content = response.choices[0].message.content
+                content = response["content"]
                 logger.debug(f"API call succeeded on attempt {attempt}")
                 return content
 
-            except RateLimitError as e:
-                logger.warning(f"Rate limit hit on attempt {attempt}: {str(e)}")
-                if attempt < MAX_RETRIES:
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
-                else:
-                    raise RuntimeError(f"Rate limit exceeded after {MAX_RETRIES} attempts")
-
-            except APITimeoutError as e:
-                logger.warning(f"API timeout on attempt {attempt}: {str(e)}")
-                if attempt < MAX_RETRIES:
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
-                else:
-                    raise RuntimeError(f"API timeout after {MAX_RETRIES} attempts")
-
-            except APIConnectionError as e:
-                logger.warning(f"Connection error on attempt {attempt}: {str(e)}")
+            except (ConnectionError, TimeoutError) as e:
+                # Handle connection/timeout errors with retry
+                logger.warning(f"Connection/timeout error on attempt {attempt}: {str(e)}")
                 if attempt < MAX_RETRIES:
                     time.sleep(retry_delay)
                     retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
                 else:
                     raise RuntimeError(f"Connection failed after {MAX_RETRIES} attempts")
 
-            except APIError as e:
-                logger.error(f"API error on attempt {attempt}: {str(e)}")
-                if attempt < MAX_RETRIES and e.status_code >= 500:
-                    # Retry on server errors
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+            except ValueError as e:
+                # Handle API errors (providers may raise ValueError for API issues)
+                error_msg = str(e).lower()
+                if "rate limit" in error_msg or "quota" in error_msg:
+                    logger.warning(f"Rate limit hit on attempt {attempt}: {str(e)}")
+                    if attempt < MAX_RETRIES:
+                        time.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
+                    else:
+                        raise RuntimeError(f"Rate limit exceeded after {MAX_RETRIES} attempts")
                 else:
+                    # Other ValueError, don't retry
                     raise RuntimeError(f"API error: {str(e)}")
 
             except Exception as e:

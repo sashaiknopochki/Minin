@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
-from services.llm_translation_service import translate_text, GPT_4_1_MINI
+from services.llm_translation_service import translate_text, DEFAULT_MODEL
 from services.user_search_service import log_user_search
 from services.session_service import get_or_create_session
 from services.language_utils import get_language_code
@@ -87,7 +87,7 @@ def translate():
 
         # Optional fields
         native_language = data.get('native_language', 'English')
-        model = data.get('model', GPT_4_1_MINI)
+        model = data.get('model', DEFAULT_MODEL)
 
         # Convert language names to codes
         source_language_code = get_language_code(source_language)
