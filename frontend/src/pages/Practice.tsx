@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
+import { Card, CardContent } from "@/components/ui/card"
 import { QuizQuestion, type QuizData, type QuizResult } from "@/components/QuizQuestion"
 import { useAuth } from "@/contexts/AuthContext"
 import { useLanguageContext } from "@/contexts/LanguageContext"
@@ -289,78 +290,82 @@ export default function Practice() {
       )}
 
       {/* Quiz Question Area */}
-      <div className="max-w-2xl mx-auto">
-        {/* Loading State */}
-        {loading && !quizData && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        )}
+      <div className="max-w-md mx-auto">
+        <Card>
+          <CardContent>
+            {/* Loading State */}
+            {loading && !quizData && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
 
-        {/* Empty State (no phrases match filters) */}
-        {!loading && totalCount === 0 && !sessionComplete && !quizData && (
-          <div className="text-center py-16">
-            <p className="text-lg text-muted-foreground">
-              No phrases match your current filters.
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Try adjusting your selection or practice some more to unlock new phrases!
-            </p>
-          </div>
-        )}
+            {/* Empty State (no phrases match filters) */}
+            {!loading && totalCount === 0 && !sessionComplete && !quizData && (
+              <div className="text-center py-16">
+                <p className="text-lg text-muted-foreground">
+                  No phrases match your current filters.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Try adjusting your selection or practice some more to unlock new phrases!
+                </p>
+              </div>
+            )}
 
-        {/* Session Complete State */}
-        {sessionComplete && (
-          <div className="text-center py-16">
-            <h2 className="text-2xl font-bold mb-4">Great work!</h2>
-            <p className="text-lg text-muted-foreground mb-6">
-              You've completed all {seenPhraseIds.length} phrases matching these filters.
-            </p>
-            <Button
-              onClick={() => {
-                setSeenPhraseIds([])
-                setCurrentPosition(0)
-                setSessionComplete(false)
-                fetchNextQuestion()
-              }}
-            >
-              Start Over
-            </Button>
-          </div>
-        )}
-
-        {/* Active Quiz */}
-        {!loading && !sessionComplete && quizData && (
-          <>
-            <QuizQuestion
-              quizData={quizData}
-              onSubmit={handleQuizSubmit}
-              result={quizResult}
-              isLoading={loading}
-            />
-
-            {/* Action Buttons */}
-            <div className="mt-6 flex gap-2">
-              {!quizResult ? (
+            {/* Session Complete State */}
+            {sessionComplete && (
+              <div className="text-center py-16">
+                <h2 className="text-2xl font-bold mb-4">Great work!</h2>
+                <p className="text-lg text-muted-foreground mb-6">
+                  You've completed all {seenPhraseIds.length} phrases matching these filters.
+                </p>
                 <Button
-                  variant="outline"
-                  onClick={handleSkip}
-                  disabled={loading}
+                  onClick={() => {
+                    setSeenPhraseIds([])
+                    setCurrentPosition(0)
+                    setSessionComplete(false)
+                    fetchNextQuestion()
+                  }}
                 >
-                  Skip for now
+                  Start Over
                 </Button>
-              ) : (
-                <Button
-                  variant="default"
-                  onClick={handleContinue}
-                  disabled={loading}
-                >
-                  Next question
-                </Button>
-              )}
-            </div>
-          </>
-        )}
+              </div>
+            )}
+
+            {/* Active Quiz */}
+            {!loading && !sessionComplete && quizData && (
+              <>
+                <QuizQuestion
+                  quizData={quizData}
+                  onSubmit={handleQuizSubmit}
+                  result={quizResult}
+                  isLoading={loading}
+                />
+
+                {/* Action Buttons */}
+                <div className="mt-6 flex gap-2">
+                  {!quizResult ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleSkip}
+                      disabled={loading}
+                    >
+                      Skip for now
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      onClick={handleContinue}
+                      disabled={loading}
+                    >
+                      Next question
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

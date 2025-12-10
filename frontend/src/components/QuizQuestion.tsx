@@ -102,7 +102,7 @@ export function QuizQuestion({
     if (!result) {
       // Reserve space to prevent jumping
       return (
-        <div className="p-4 bg-transparent rounded-lg min-h-[68px]">
+        <div className="p-4 bg-transparent rounded-lg min-h-[68px] text-left">
           <p className="text-sm text-transparent leading-relaxed">
             Keep practicing! "house" is incorrect. The correct answer is "placeholder".
           </p>
@@ -112,7 +112,7 @@ export function QuizQuestion({
 
     if (result.was_correct) {
       return (
-        <div className="p-4 bg-muted rounded-lg min-h-[68px]">
+        <div className="p-4 bg-muted rounded-lg min-h-[68px] text-left">
           <p className="text-sm text-foreground leading-relaxed">
             Good job! <strong>"{result.user_answer}"</strong> is the correct answer.
           </p>
@@ -120,7 +120,7 @@ export function QuizQuestion({
       )
     } else {
       return (
-        <div className="p-4 bg-muted rounded-lg min-h-[68px]">
+        <div className="p-4 bg-muted rounded-lg min-h-[68px] text-left">
           <p className="text-sm text-foreground leading-relaxed">
             Keep practicing! <strong>"{result.user_answer}"</strong> is incorrect. The correct answer is <strong>"{result.correct_answer}"</strong>.
           </p>
@@ -160,7 +160,7 @@ export function QuizQuestion({
           )}
 
           {result && (
-            <div className="p-4 bg-muted rounded-lg border">
+            <div className="p-4 bg-muted rounded-lg border text-left">
               <div className="flex items-center gap-2 mb-2">
                 {result.was_correct ? (
                   <>
@@ -174,11 +174,11 @@ export function QuizQuestion({
                   </>
                 )}
               </div>
-              <p className="text-sm">
+              <p className="text-sm text-left">
                 Your answer: <strong className={result.was_correct ? '' : 'line-through'}>{result.user_answer}</strong>
               </p>
               {!result.was_correct && (
-                <p className="text-sm mt-1">
+                <p className="text-sm mt-1 text-left">
                   Correct answer: <strong>{result.correct_answer}</strong>
                 </p>
               )}
