@@ -19,15 +19,18 @@ from models.user_learning_progress import UserLearningProgress
 from models.phrase import Phrase
 from models.phrase_translation import PhraseTranslation
 from models.language import Language
-from openai import OpenAI
+from services.llm_provider_factory import get_llm_client, LLMProviderFactory
 from dotenv import load_dotenv
 import os
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# OpenAI model for answer evaluation
-DEFAULT_MODEL = "gpt-4o-mini"  # Cost-effective model for evaluation
+# Load environment variables
+load_dotenv()
+
+# Get default model based on configured provider
+DEFAULT_MODEL = LLMProviderFactory.get_default_model()
 
 
 class AnswerEvaluationService:
@@ -392,13 +395,8 @@ class AnswerEvaluationService:
 
         # Tier 3: LLM-based flexible evaluation
         try:
-            load_dotenv()
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                logger.warning("OPENAI_API_KEY not found, skipping LLM evaluation")
-                return False
-
-            client = OpenAI(api_key=api_key)
+            # Initialize LLM provider
+            provider = get_llm_client()
 
             # Extract context sentence if this is a contextual question
             context_sentence = None
@@ -444,18 +442,19 @@ Return ONLY valid JSON, no other text:
 
             system_message = "You are a fair language learning quiz evaluator. Be lenient with minor errors but strict about meaning. Return only valid JSON."
 
-            response = client.chat.completions.create(
-                model=DEFAULT_MODEL,
+            # Call LLM provider
+            response = provider.create_chat_completion(
                 messages=[
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt}
                 ],
+                model=DEFAULT_MODEL,
                 temperature=0.3,  # Lower temperature for consistency
                 max_tokens=200,
                 timeout=10.0
             )
 
-            result_text = response.choices[0].message.content.strip()
+            result_text = response["content"].strip()
             result = json.loads(result_text)
 
             is_correct = result.get('is_correct', False)

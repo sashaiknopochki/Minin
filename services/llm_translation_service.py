@@ -1,6 +1,6 @@
 """
 LLM Translation Service
-Handles translation using OpenAI API with support for multiple target languages
+Handles translation using LLM providers (OpenAI, Mistral, etc.) with support for multiple target languages
 """
 
 import os
@@ -8,26 +8,24 @@ import json
 import logging
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
-from openai import OpenAI
 from pydantic import BaseModel, Field
+from services.llm_provider_factory import get_llm_client, LLMProviderFactory
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Model constants
+# Load environment variables
+load_dotenv()
+
+# Get default model based on configured provider
+DEFAULT_MODEL = LLMProviderFactory.get_default_model()
+
+# Model constants for backward compatibility
 GPT_4_1_MINI = "gpt-4.1-mini"
 O4_MINI = "o4-mini"
-DEFAULT_MODEL = GPT_4_1_MINI
-
-# Models that support structured outputs
-STRUCTURED_OUTPUT_MODELS = {
-    "gpt-4o-mini",
-    "gpt-4.1-mini",
-    "o4-mini",
-    "gpt-4o-2024-08-06",
-    "gpt-4o-2024-11-20",
-    "gpt-4o",
-}
+MISTRAL_SMALL = "mistral-small-latest"
+MISTRAL_MEDIUM = "mistral-medium-latest"
+MISTRAL_LARGE = "mistral-large-latest"
 
 
 # Pydantic models for structured outputs
@@ -79,24 +77,19 @@ def translate_text(
         - usage: token usage stats (if success)
         - error: error message (if failed)
     """
-    # Load environment variables
-    load_dotenv()
-
-    # Get API key from environment
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logger.error("OPENAI_API_KEY not found in environment variables")
+    # Initialize LLM provider
+    try:
+        provider = get_llm_client()
+    except ValueError as e:
+        logger.error(f"Failed to initialize LLM provider: {str(e)}")
         return {
             "success": False,
-            "error": "OPENAI_API_KEY not configured",
+            "error": f"LLM provider configuration error: {str(e)}",
             "original_text": text,
             "source_language": source_language,
             "target_languages": target_languages,
             "native_language": native_language
         }
-
-    # Initialize OpenAI client
-    client = OpenAI(api_key=api_key)
 
     # Create system prompt for translation with spell-checking and multiple meanings
     target_langs_str = ", ".join(target_languages)
@@ -220,24 +213,20 @@ Invalid/misspelled word:
 """
 
     # Check if model supports structured outputs
-    use_structured_output = model in STRUCTURED_OUTPUT_MODELS
+    use_structured_output = provider.supports_structured_output(model)
 
     # Make API call
     try:
         logger.info(f"Translating '{text}' from {source_language} to {target_languages}")
 
-        # Prepare API call parameters with lower temperature for deterministic spell-checking
-        api_params = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            "temperature": 0.2,  # Lower temperature for more consistent spell-checking
-            "max_tokens": 1000  # Increased for spell-check fields
-        }
+        # Prepare messages
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
 
-        # Add structured output for supported models
+        # Prepare response format
+        response_format = None
         if use_structured_output:
             # Build dynamic schema with specific language properties
             language_properties = {}
@@ -287,19 +276,26 @@ Invalid/misspelled word:
                     "additionalProperties": False
                 }
             }
-            api_params["response_format"] = {
+            response_format = {
                 "type": "json_schema",
                 "json_schema": json_schema
             }
             logger.info(f"Using structured outputs for model {model}")
         else:
             # For models that don't support structured outputs, request JSON mode
-            api_params["response_format"] = {"type": "json_object"}
+            response_format = {"type": "json_object"}
             logger.info(f"Using JSON mode for model {model}")
 
-        response = client.chat.completions.create(**api_params)
+        # Call the LLM provider
+        response = provider.create_chat_completion(
+            messages=messages,
+            model=model,
+            temperature=0.2,  # Lower temperature for more consistent spell-checking
+            max_tokens=1000,  # Increased for spell-check fields
+            response_format=response_format
+        )
 
-        translation_content = response.choices[0].message.content
+        translation_content = response["content"]
 
         # Parse JSON response
         try:
@@ -325,11 +321,7 @@ Invalid/misspelled word:
                     "target_languages": target_languages,
                     "original_text": text,
                     "model": model,
-                    "usage": {
-                        "prompt_tokens": response.usage.prompt_tokens,
-                        "completion_tokens": response.usage.completion_tokens,
-                        "total_tokens": response.usage.total_tokens
-                    }
+                    "usage": response["usage"]
                 }
 
             # Fallback if translations not in expected format
@@ -340,7 +332,7 @@ Invalid/misspelled word:
             translations_dict = {target_languages[0]: [[translation_content, "", ""]]}
             source_info = [text, "", ""]
 
-        logger.info(f"Translation successful. Tokens used: {response.usage.total_tokens}")
+        logger.info(f"Translation successful. Tokens used: {response['usage']['total_tokens']}")
 
         return {
             "success": True,
@@ -352,11 +344,7 @@ Invalid/misspelled word:
             "source_info": source_info,
             "translations": translations_dict,
             "model": model,
-            "usage": {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens
-            }
+            "usage": response["usage"]
         }
 
     except Exception as e:

@@ -143,7 +143,7 @@ export default function Translate() {
           source_language: getLanguageName(sourceLang),
           target_languages: targetLangs.map(getLanguageName),
           native_language: getNativeLanguage(),
-          model: "gpt-4.1-mini",
+          // Let backend choose model based on LLM_PROVIDER env var
         }),
       });
 
