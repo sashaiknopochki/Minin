@@ -37,6 +37,46 @@ INITIAL_RETRY_DELAY = 1.0  # seconds
 MAX_RETRY_DELAY = 10.0  # seconds
 
 
+def _strip_markdown_code_fences(content: str) -> str:
+    """
+    Strip markdown code fences from LLM response.
+
+    Different LLM providers format their JSON responses differently:
+    - OpenAI typically returns raw JSON
+    - Mistral often wraps JSON in ```json ... ``` markdown code fences
+
+    This function normalizes the response by removing code fences if present.
+
+    Args:
+        content: The raw LLM response content
+
+    Returns:
+        Cleaned content with code fences removed
+
+    Examples:
+        >>> _strip_markdown_code_fences('```json\\n{"key": "value"}\\n```')
+        '{"key": "value"}'
+        >>> _strip_markdown_code_fences('{"key": "value"}')
+        '{"key": "value"}'
+    """
+    content = content.strip()
+
+    # Check for markdown code fences (```json or ``` or ```JSON)
+    if content.startswith('```'):
+        # Remove opening fence
+        lines = content.split('\n')
+        # First line is the opening fence (```json or ```)
+        lines = lines[1:]
+
+        # Remove closing fence if present
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+
+        content = '\n'.join(lines).strip()
+
+    return content
+
+
 class QuestionGenerationService:
     """Service to generate quiz questions using LLM"""
 
@@ -1388,6 +1428,8 @@ Example (for German word "schön"):
                 )
 
                 content = response["content"]
+                # Clean markdown code fences if present (Mistral tends to add them)
+                content = _strip_markdown_code_fences(content)
                 logger.debug(f"API call succeeded on attempt {attempt}")
                 return content
 
