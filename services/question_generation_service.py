@@ -11,8 +11,19 @@ import logging
 import time
 import random
 from typing import Dict, Any, Optional, List
+from decimal import Decimal
 from dotenv import load_dotenv
 from services.llm_provider_factory import get_llm_client, LLMProviderFactory
+from services.llm_models.question_models import (
+    MultipleChoiceQuestion,
+    TextInputQuestion,
+    ContextualQuestion,
+    DefinitionQuestion,
+    SynonymQuestion
+)
+from services.cost_service import CostCalculationService
+from services.session_cost_aggregator import add_quiz_cost
+from services.session_service import get_or_create_session
 
 from models import db
 from models.quiz_attempt import QuizAttempt
@@ -212,7 +223,7 @@ class QuestionGenerationService:
                     native_language=user.primary_language_code
                 )
 
-            # Update quiz attempt
+            # Update quiz attempt with question and answer
             quiz_attempt.prompt_json = question_data['prompt']
 
             # Handle correct_answer: convert list to JSON string if needed
@@ -221,6 +232,23 @@ class QuestionGenerationService:
                 quiz_attempt.correct_answer = json.dumps(correct_answer)
             else:
                 quiz_attempt.correct_answer = correct_answer
+
+            # Store cost data if available (from Phase 4)
+            if 'generation_cost' in question_data:
+                gen_cost = question_data['generation_cost']
+                quiz_attempt.question_gen_prompt_tokens = gen_cost['tokens']['prompt_tokens']
+                quiz_attempt.question_gen_completion_tokens = gen_cost['tokens']['completion_tokens']
+                quiz_attempt.question_gen_total_tokens = gen_cost['tokens']['total_tokens']
+                quiz_attempt.question_gen_cost_usd = float(gen_cost['cost_usd'])
+                quiz_attempt.question_gen_model = gen_cost['model']
+
+                # Aggregate to session
+                try:
+                    session = get_or_create_session(user.id)
+                    add_quiz_cost(session.session_id, gen_cost['cost_usd'])
+                    logger.debug(f"Added quiz generation cost ${gen_cost['cost_usd']} to session {session.session_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to aggregate quiz cost to session: {e}")
 
             db.session.commit()
 
@@ -398,7 +426,7 @@ class QuestionGenerationService:
         source_lang = Language.query.get(phrase_language)
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
-        prompt = f"""Generate a multiple choice question to test translation recognition.
+        user_message = f"""Generate a multiple choice question to test translation recognition.
 
 Source phrase: "{phrase_text}"
 Source language: {source_lang_name}
@@ -415,7 +443,6 @@ Requirements:
 6. Distractors should be plausible words in {native_lang_name} but clearly wrong for this phrase
 7. Distractors should be at similar difficulty level (don't use obvious unrelated words)
 8. The order of options in your response doesn't matter - they will be randomized
-9. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -436,51 +463,57 @@ If multiple meanings exist, use this format:
 }}
 """
 
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality multiple choice questions."},
+            {"role": "user", "content": user_message}
+        ]
+
         try:
-            # Call OpenAI API with retry logic
-            content = QuestionGenerationService._call_api_with_retry(provider, prompt)
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=MultipleChoiceQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
+            )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response structure
-            required_fields = ['question', 'options', 'correct_answer', 'question_language', 'answer_language']
-            for field in required_fields:
-                if field not in result:
-                    raise ValueError(f"LLM response missing required field: {field}")
-
-            if not isinstance(result['options'], list) or len(result['options']) != 4:
-                raise ValueError(f"LLM response must have exactly 4 options")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
             # Shuffle the options to randomize correct answer position
             shuffled_options = QuestionGenerationService._shuffle_options(
-                result['options'],
-                result['correct_answer']
+                question_obj.options,
+                question_obj.correct_answer
             )
 
-            logger.info(f"Generated multiple_choice_target question for '{phrase_text}'")
+            logger.info(f"Generated multiple_choice_target question for '{phrase_text}' (cost: ${cost_usd})")
 
             return {
                 'prompt': {
-                    'question': result['question'],
+                    'question': question_obj.question,
                     'options': shuffled_options,
-                    'question_language': result['question_language'],
-                    'answer_language': result['answer_language']
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating multiple_choice_target question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
 
     @staticmethod
@@ -506,7 +539,6 @@ If multiple meanings exist, use this format:
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
         # Extract a primary translation to use in the question
-        # (We'll use the first translation from the native language)
         primary_translation = "the word"
         if native_lang_name in translations:
             trans_data = translations[native_lang_name]
@@ -517,7 +549,7 @@ If multiple meanings exist, use this format:
                 if isinstance(trans_data[0], list) and len(trans_data[0]) > 0:
                     primary_translation = trans_data[0][0]
 
-        prompt = f"""Generate a multiple choice question to test reverse translation (native language to source language).
+        user_message = f"""Generate a multiple choice question to test reverse translation (native language to source language).
 
 Source phrase (correct answer): "{phrase_text}"
 Source language: {source_lang_name}
@@ -533,7 +565,6 @@ Requirements:
 5. Distractors should be plausible {source_lang_name} words but clearly wrong for this meaning
 6. Distractors should be at similar difficulty level
 7. The order of options in your response doesn't matter - they will be randomized
-8. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -545,51 +576,57 @@ Return format:
 }}
 """
 
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality multiple choice questions."},
+            {"role": "user", "content": user_message}
+        ]
+
         try:
-            # Call OpenAI API with retry logic
-            content = QuestionGenerationService._call_api_with_retry(provider, prompt)
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=MultipleChoiceQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
+            )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response structure
-            required_fields = ['question', 'options', 'correct_answer', 'question_language', 'answer_language']
-            for field in required_fields:
-                if field not in result:
-                    raise ValueError(f"LLM response missing required field: {field}")
-
-            if not isinstance(result['options'], list) or len(result['options']) != 4:
-                raise ValueError(f"LLM response must have exactly 4 options")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
             # Shuffle the options to randomize correct answer position
             shuffled_options = QuestionGenerationService._shuffle_options(
-                result['options'],
-                result['correct_answer']
+                question_obj.options,
+                question_obj.correct_answer
             )
 
-            logger.info(f"Generated multiple_choice_source question for '{phrase_text}'")
+            logger.info(f"Generated multiple_choice_source question for '{phrase_text}' (cost: ${cost_usd})")
 
             return {
                 'prompt': {
-                    'question': result['question'],
+                    'question': question_obj.question,
                     'options': shuffled_options,
-                    'question_language': result['question_language'],
-                    'answer_language': result['answer_language']
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating multiple_choice_source question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
 
     @staticmethod
@@ -631,7 +668,7 @@ Return format:
         source_lang = Language.query.get(phrase_language)
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
-        prompt = f"""Generate a text input question to test translation recall (production).
+        user_message = f"""Generate a text input question to test translation recall (production).
 
 Source phrase: "{phrase_text}"
 Source language: {source_lang_name}
@@ -645,7 +682,6 @@ Requirements:
 3. IMPORTANT: End the question with a period
 4. No multiple choice options - user types the answer
 5. If the word has multiple valid meanings, list ALL in correct_answer as an array
-6. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -666,52 +702,54 @@ If multiple meanings exist, use this format:
 }}
 """
 
-        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality text input questions."},
+            {"role": "user", "content": user_message}
+        ]
 
-        # Call LLM with retry logic
         try:
-            content = QuestionGenerationService._call_api_with_retry(
-                provider=provider,
-                prompt=prompt,
-                system_message=system_message
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=TextInputQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
             )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response has required fields
-            if 'question' not in result or 'correct_answer' not in result:
-                logger.warning(f"LLM returned incomplete response for text_input_target: {result}")
-                raise ValueError("Incomplete LLM response")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
-            # Force options to null for text input
-            result['options'] = None
+            logger.info(f"Generated text_input_target question for '{phrase_text}' (cost: ${cost_usd})")
 
-            logger.info(f"Generated text_input_target question for '{phrase_text}'")
-
-            # Return structured response
             return {
                 'prompt': {
-                    'question': result['question'],
+                    'question': question_obj.question,
                     'options': None,
-                    'question_language': result.get('question_language', native_language),
-                    'answer_language': result.get('answer_language', native_language)
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating text_input_target question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
+
+
 
     @staticmethod
     def _generate_text_input_source(
@@ -780,7 +818,7 @@ If multiple meanings exist, use this format:
             logger.warning(f"No native translation found for {phrase_text}, using phrase itself")
             native_translation = phrase_text
 
-        prompt = f"""Generate a reverse text input question to test production in the target language.
+        user_message = f"""Generate a reverse text input question to test production in the target language.
 
 Native word: "{native_translation}"
 Native language: {native_lang_name}
@@ -795,7 +833,6 @@ Requirements:
 3. IMPORTANT: End the question with a period
 4. No multiple choice options - user types the answer
 5. The correct answer is the original phrase: "{phrase_text}"
-6. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -807,52 +844,54 @@ Return format:
 }}
 """
 
-        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality text input questions."},
+            {"role": "user", "content": user_message}
+        ]
 
-        # Call LLM with retry logic
         try:
-            content = QuestionGenerationService._call_api_with_retry(
-                provider=provider,
-                prompt=prompt,
-                system_message=system_message
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=TextInputQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
             )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response
-            if 'question' not in result or 'correct_answer' not in result:
-                logger.warning(f"LLM returned incomplete response for text_input_source: {result}")
-                raise ValueError("Incomplete LLM response")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
-            # Force options to null
-            result['options'] = None
+            logger.info(f"Generated text_input_source question for '{phrase_text}' (cost: ${cost_usd})")
 
-            logger.info(f"Generated text_input_source question for '{phrase_text}'")
-
-            # Return structured response
             return {
                 'prompt': {
-                    'question': result['question'],
+                    'question': question_obj.question,
                     'options': None,
-                    'question_language': result.get('question_language', native_language),
-                    'answer_language': result.get('answer_language', phrase_language)
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating text_input_source question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
+
+
 
     @staticmethod
     def _generate_contextual(
@@ -911,7 +950,7 @@ Return format:
         source_lang = Language.query.get(phrase_language)
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
-        prompt = f"""Generate a contextual translation question.
+        user_message = f"""Generate a contextual translation question.
 
 Context sentence: "{context_sentence}"
 Word to test: "{phrase_text}"
@@ -927,7 +966,6 @@ Requirements:
 4. The correct answer must match the context of the sentence
 5. If word has multiple meanings, only the contextually appropriate one is correct
 6. Include the full context sentence in the question
-7. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -939,49 +977,52 @@ Return format:
 }}
 """
 
-        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality contextual questions."},
+            {"role": "user", "content": user_message}
+        ]
 
-        # Call LLM with retry logic
         try:
-            content = QuestionGenerationService._call_api_with_retry(
-                provider=provider,
-                prompt=prompt,
-                system_message=system_message
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=ContextualQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
             )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response
-            if 'question' not in result or 'correct_answer' not in result:
-                logger.warning(f"LLM returned incomplete response for contextual: {result}")
-                raise ValueError("Incomplete LLM response")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
-            logger.info(f"Generated contextual question for '{phrase_text}' with context")
+            logger.info(f"Generated contextual question for '{phrase_text}' with context (cost: ${cost_usd})")
 
-            # Return structured response
             return {
                 'prompt': {
-                    'question': result['question'],
-                    'options': None,  # Text input
-                    'question_language': result.get('question_language', phrase_language),
-                    'answer_language': result.get('answer_language', native_language),
-                    'context_sentence': context_sentence  # Store for evaluation
+                    'question': question_obj.question,
+                    'options': None,
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language,
+                    'context_sentence': context_sentence
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating contextual question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
 
     @staticmethod
@@ -1020,7 +1061,7 @@ Return format:
         source_lang = Language.query.get(phrase_language)
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
-        prompt = f"""Generate a definition question.
+        user_message = f"""Generate a definition question.
 
 Word to test: "{phrase_text}"
 Source language: {source_lang_name}
@@ -1035,7 +1076,6 @@ Requirements:
 5. This tests deep understanding - user must explain the word in the language they're learning
 6. If multiple acceptable definitions exist, provide them as a list
 7. No options - text input only
-8. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -1054,56 +1094,51 @@ Example (for German word "geben"):
 }}
 """
 
-        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality definition questions."},
+            {"role": "user", "content": user_message}
+        ]
 
-        # Call LLM with retry logic
         try:
-            content = QuestionGenerationService._call_api_with_retry(
-                provider=provider,
-                prompt=prompt,
-                system_message=system_message
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=DefinitionQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
             )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response
-            if 'question' not in result or 'correct_answer' not in result:
-                logger.warning(f"LLM returned incomplete response for definition: {result}")
-                raise ValueError("Incomplete LLM response")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
-            # Validate that answer_language is source language (not native language)
-            if result.get('answer_language') == native_language:
-                logger.warning(
-                    f"Definition question returned answer_language={native_language}, "
-                    f"correcting to source language {phrase_language}"
-                )
-                result['answer_language'] = phrase_language
+            logger.info(f"Generated definition question for '{phrase_text}' (cost: ${cost_usd})")
 
-            logger.info(f"Generated definition question for '{phrase_text}'")
-
-            # Return structured response
             return {
                 'prompt': {
-                    'question': result['question'],
-                    'options': None,  # Text input
-                    'question_language': result.get('question_language', phrase_language),
-                    'answer_language': result.get('answer_language', phrase_language)
+                    'question': question_obj.question,
+                    'options': None,
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating definition question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
 
     @staticmethod
@@ -1142,7 +1177,7 @@ Example (for German word "geben"):
         source_lang = Language.query.get(phrase_language)
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
-        prompt = f"""Generate a synonym question.
+        user_message = f"""Generate a synonym question.
 
 Word to test: "{phrase_text}"
 Source language: {source_lang_name}
@@ -1159,7 +1194,6 @@ Requirements:
 7. Provide multiple acceptable synonyms as a list
 8. This tests vocabulary breadth within the target language
 9. No options - text input only
-10. Return ONLY valid JSON, no other text
 
 Return format:
 {{
@@ -1178,57 +1212,53 @@ Example (for German word "schön"):
 }}
 """
 
-        system_message = "You are a language learning quiz generator. Return only valid JSON with no additional text."
+        messages = [
+            {"role": "system", "content": "You are a language learning quiz generator. Generate high-quality synonym questions."},
+            {"role": "user", "content": user_message}
+        ]
 
-        # Call LLM with retry logic
         try:
-            content = QuestionGenerationService._call_api_with_retry(
-                provider=provider,
-                prompt=prompt,
-                system_message=system_message
+            # Use structured outputs with Pydantic
+            response = provider.create_structured_completion(
+                messages=messages,
+                response_model=SynonymQuestion,
+                model=DEFAULT_MODEL,
+                temperature=0.7,
+                max_tokens=500
             )
 
-            # Parse JSON response
-            result = json.loads(content)
+            question_obj = response["parsed_object"]
 
-            # Validate response
-            if 'question' not in result or 'correct_answer' not in result:
-                logger.warning(f"LLM returned incomplete response for synonym: {result}")
-                raise ValueError("Incomplete LLM response")
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"]["cached_tokens"]
+            )
 
-            # Validate that answer_language is source language (not native language)
-            if result.get('answer_language') == native_language:
-                logger.warning(
-                    f"Synonym question returned answer_language={native_language}, "
-                    f"correcting to source language {phrase_language}"
-                )
-                result['answer_language'] = phrase_language
+            logger.info(f"Generated synonym question for '{phrase_text}' (cost: ${cost_usd})")
 
-            logger.info(f"Generated synonym question for '{phrase_text}'")
-
-            # Return structured response
             return {
                 'prompt': {
-                    'question': result['question'],
-                    'options': None,  # Text input
-                    'question_language': result.get('question_language', phrase_language),
-                    'answer_language': result.get('answer_language', phrase_language)
+                    'question': question_obj.question,
+                    'options': None,
+                    'question_language': question_obj.question_language,
+                    'answer_language': question_obj.answer_language
                 },
-                'correct_answer': result['correct_answer']
+                'correct_answer': question_obj.correct_answer,
+                'generation_cost': {
+                    'tokens': response["usage"],
+                    'cost_usd': cost_usd,
+                    'model': response["model"]
+                }
             }
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Response content: {content}")
-            raise RuntimeError(f"LLM returned invalid JSON: {e}")
-
-        except ValueError as e:
-            logger.error(f"LLM response validation failed: {e}")
-            raise RuntimeError(f"Invalid LLM response: {e}")
-
         except Exception as e:
-            logger.error(f"Error calling OpenAI API: {e}")
+            logger.error(f"Error generating synonym question: {e}")
             raise RuntimeError(f"Failed to generate question: {e}")
+
 
     @staticmethod
     def _generate_fallback_question(
