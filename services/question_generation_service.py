@@ -931,20 +931,6 @@ Return format:
                 'correct_answer': str
             }
         """
-        # If no context available, fallback to text_input_target
-        if not context_sentence:
-            logger.warning(
-                f"No context_sentence available for contextual question on '{phrase_text}'. "
-                f"Falling back to text_input_target."
-            )
-            return QuestionGenerationService._generate_text_input_target(
-                provider=provider,
-                phrase_text=phrase_text,
-                phrase_language=phrase_language,
-                translations=translations,
-                native_language=native_language
-            )
-
         # Get native language name
         native_lang = Language.query.get(native_language)
         native_lang_name = native_lang.en_name if native_lang else "English"
@@ -953,9 +939,18 @@ Return format:
         source_lang = Language.query.get(phrase_language)
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
+        # If context sentence is missing, instruction to generate one
+        context_instruction = ""
+        if context_sentence:
+            context_instruction = f'Context sentence: "{context_sentence}"'
+        else:
+            context_instruction = f"""Context sentence: NONE PROVIDED.
+Action: GENERATE a simple, clear sentence in {source_lang_name} using the word "{phrase_text}".
+Use this generated sentence as the context for the question."""
+
         user_message = f"""Generate a contextual translation question.
 
-Context sentence: "{context_sentence}"
+{context_instruction}
 Word to test: "{phrase_text}"
 Source language: {source_lang_name}
 Target language (native): {native_lang_name}
@@ -965,14 +960,15 @@ Available translations: {json.dumps(translations, ensure_ascii=False)}
 Requirements:
 1. Ask question in SOURCE language ({source_lang_name})
 2. User answers in their NATIVE language ({native_lang_name})
-3. Question format: "In the sentence '{context_sentence}', what does '{phrase_text}' mean?"
+3. Question format: "In the sentence '[context_sentence]', what does '{phrase_text}' mean?"
 4. The correct answer must match the context of the sentence
 5. If word has multiple meanings, only the contextually appropriate one is correct
-6. Include the full context sentence in the question
+6. Include the full context sentence (provided or generated) in the question
+7. If you generated a sentence, ensure it clearly demonstrates the word's meaning
 
 Return format:
 {{
-  "question": "In the sentence '{context_sentence}', what does '{phrase_text}' mean?",
+  "question": "In the sentence '[context_sentence]', what does '{phrase_text}' mean?",
   "correct_answer": "contextually appropriate translation",
   "contextual_meaning": "brief explanation of why this meaning fits the context",
   "question_language": "{phrase_language}",
