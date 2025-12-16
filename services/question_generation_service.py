@@ -792,10 +792,16 @@ If multiple meanings exist, use this format:
         source_lang_name = source_lang.en_name if source_lang else phrase_language
 
         # Extract a native translation to show in question
+        # CRITICAL: Must use NATIVE language translation, not any other learning language
         native_translation = None
-        for lang_name, trans_data in translations.items():
+        
+        # Look specifically for the user's native language translation
+        if native_lang_name in translations:
+            trans_data = translations[native_lang_name]
+            
+            # Handle different data structures
             if isinstance(trans_data, dict):
-                # Try different structures
+                # translations_json format: {"Russian": [[...], [...]], ...}
                 for key in trans_data:
                     if isinstance(trans_data[key], list) and trans_data[key]:
                         if isinstance(trans_data[key][0], list) and trans_data[key][0]:
@@ -804,18 +810,15 @@ If multiple meanings exist, use this format:
                         elif isinstance(trans_data[key][0], str):
                             native_translation = trans_data[key][0]
                             break
-                if native_translation:
-                    break
             elif isinstance(trans_data, list) and len(trans_data) > 0:
+                # Simple list format
                 if isinstance(trans_data[0], list) and len(trans_data[0]) > 0:
                     native_translation = trans_data[0][0]
-                    break
                 elif isinstance(trans_data[0], str):
                     native_translation = trans_data[0]
-                    break
 
         if not native_translation:
-            logger.warning(f"No native translation found for {phrase_text}, using phrase itself")
+            logger.warning(f"No {native_lang_name} translation found for {phrase_text}, using phrase itself")
             native_translation = phrase_text
 
         user_message = f"""Generate a reverse text input question to test production in the target language.
