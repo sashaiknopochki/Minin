@@ -17,24 +17,33 @@ class TranslationEntry(BaseModel):
 
 
 class TranslationResponse(BaseModel):
-    """Structured response containing translations for all target languages.
-
-    Each field is a target language name with a list of translation entries.
-    The model is dynamically created based on target_languages parameter.
+    """Structured response containing translations for all target languages with spell-checking.
 
     Example structure:
     {
+        "word_exists": true,
+        "sent_word": "collection",
+        "correct_word": "",
+        "source_info": ["collection", "noun", "a group of things collected"],
         "translations": {
-            "English": [
-                ["to give", "verb", "to hand over or transfer something"],
-                ["to provide", "verb", "to supply or make available"]
+            "German": [
+                ["Sammlung", "noun, feminine", "a group of things collected"],
+                ["Kollektion", "noun, feminine", "a fashion/design collection"]
             ],
-            "French": [
-                ["donner", "verbe", "transférer quelque chose à quelqu'un"]
+            "Russian": [
+                ["коллекция", "noun", "собрание предметов"]
             ]
         }
     }
     """
+    word_exists: bool = Field(description="Whether the word exists and is correctly spelled in the source language")
+    sent_word: str = Field(description="The original word that was sent")
+    correct_word: str = Field(description="Suggested correct spelling (empty string if word is valid)")
+    source_info: List[str] = Field(
+        description="Array with 3 elements: [source_word, grammar_info, context/meaning]",
+        min_length=3,
+        max_length=3
+    )
     translations: Dict[str, List[List[str]]] = Field(
         description="Dictionary where keys are target language names and values are arrays of [translation, grammar_info, context] triplets"
     )

@@ -12,10 +12,12 @@ This service implements the multi-target-language caching strategy:
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from decimal import Decimal
 from models import db
 from models.phrase import Phrase
 from models.phrase_translation import PhraseTranslation
 from services.llm_translation_service import translate_text
+from services.session_cost_aggregator import add_translation_cost
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +116,15 @@ def cache_translation(
     translations_json: Dict[str, Any],
     model_name: str,
     model_version: Optional[str] = None,
-    prompt_hash: Optional[str] = None
+    prompt_hash: Optional[str] = None,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    total_tokens: int = 0,
+    cached_tokens: int = 0,
+    cost_usd: Optional[Decimal] = None
 ) -> Optional[PhraseTranslation]:
     """
-    Cache a translation for future use.
+    Cache a translation for future use with cost tracking.
 
     Args:
         phrase_id: The phrase ID
@@ -126,6 +133,11 @@ def cache_translation(
         model_name: Name of the LLM model used
         model_version: Version of the model (optional)
         prompt_hash: Hash of the prompt used (optional)
+        prompt_tokens: Number of input tokens used
+        completion_tokens: Number of output tokens used
+        total_tokens: Total tokens used
+        cached_tokens: Number of cached tokens (OpenAI only)
+        cost_usd: Estimated cost in USD
 
     Returns:
         PhraseTranslation object or None if caching failed
@@ -147,6 +159,16 @@ def cache_translation(
             existing.model_version = model_version
             existing.prompt_hash = prompt_hash
             existing.updated_at = datetime.utcnow()
+
+            # Update cost tracking fields
+            if cost_usd is not None:
+                existing.prompt_tokens = prompt_tokens
+                existing.completion_tokens = completion_tokens
+                existing.total_tokens = total_tokens
+                existing.cached_tokens = cached_tokens
+                existing.estimated_cost_usd = float(cost_usd)
+                existing.cost_calculated_at = datetime.utcnow()
+
             db.session.flush()
             return existing
 
@@ -157,7 +179,13 @@ def cache_translation(
             translations_json=translations_json,
             model_name=model_name,
             model_version=model_version,
-            prompt_hash=prompt_hash
+            prompt_hash=prompt_hash,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cached_tokens=cached_tokens,
+            estimated_cost_usd=float(cost_usd) if cost_usd is not None else 0.0,
+            cost_calculated_at=datetime.utcnow() if cost_usd is not None else None
         )
 
         db.session.add(translation)
@@ -165,7 +193,7 @@ def cache_translation(
 
         logger.info(
             f"Cached translation: phrase_id={phrase_id}, target={target_language_code}, "
-            f"model={model_name}"
+            f"model={model_name}, cost=${float(cost_usd) if cost_usd else 0:.6f}"
         )
 
         return translation
@@ -183,17 +211,19 @@ def get_or_create_translations(
     target_languages: List[str],
     target_language_codes: List[str],
     model: str,
-    native_language: str = "English"
+    native_language: str = "English",
+    session_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Get translations with intelligent caching.
+    Get translations with intelligent caching and cost tracking.
 
     This is the main function that implements the caching workflow:
     1. Get or create the phrase
     2. Check cache for each target language
     3. Call LLM only for uncached languages
-    4. Cache new translations
-    5. Return combined results
+    4. Cache new translations with cost data
+    5. Aggregate cost to session if session_id provided
+    6. Return combined results
 
     Args:
         text: The phrase text to translate
@@ -203,6 +233,7 @@ def get_or_create_translations(
         target_language_codes: List of ISO 639-1 codes (e.g., ["en", "fr"])
         model: OpenAI model name
         native_language: Language for definitions/contexts
+        session_id: Optional session UUID for cost aggregation
 
     Returns:
         Dict containing:
@@ -214,6 +245,7 @@ def get_or_create_translations(
         - cache_status: dict showing which were cached vs fresh
         - model: str (for fresh translations)
         - usage: dict (for fresh translations)
+        - cost_usd: float (for fresh translations)
     """
     try:
         # Step 1: Get or create the phrase
@@ -291,9 +323,10 @@ def get_or_create_translations(
                         "phrase_id": phrase.id
                     }
 
-            # Extract fresh translations and cache them
+            # Extract fresh translations and cost data
             fresh_translations = llm_result.get('translations', {})
             usage_stats = llm_result.get('usage')
+            cost_usd = llm_result.get('cost_usd')
             new_source_info = llm_result.get('source_info', [text, '', ''])
 
             # Update phrase with source_info if we got it from LLM and don't have it cached
@@ -304,7 +337,7 @@ def get_or_create_translations(
             elif new_source_info:
                 source_info = new_source_info  # Use fresh source_info even if we have cached
 
-            # Step 4: Cache new translations
+            # Step 4: Cache new translations with cost data
             for target_lang, target_code in zip(uncached_languages, uncached_codes):
                 if target_lang in fresh_translations:
                     translation_data = fresh_translations[target_lang]
@@ -314,10 +347,23 @@ def get_or_create_translations(
                         target_language_code=target_code,
                         translations_json=translation_data,
                         model_name=model,
-                        model_version=llm_result.get('model')  # Actual model used
+                        model_version=llm_result.get('model'),  # Actual model used
+                        prompt_tokens=usage_stats.get('prompt_tokens', 0) if usage_stats else 0,
+                        completion_tokens=usage_stats.get('completion_tokens', 0) if usage_stats else 0,
+                        total_tokens=usage_stats.get('total_tokens', 0) if usage_stats else 0,
+                        cached_tokens=usage_stats.get('cached_tokens', 0) if usage_stats else 0,
+                        cost_usd=Decimal(str(cost_usd)) if cost_usd else None
                     )
 
-        # Step 5: Combine cached and fresh translations
+            # Step 5: Aggregate cost to session if available
+            if session_id and cost_usd:
+                try:
+                    add_translation_cost(session_id, Decimal(str(cost_usd)))
+                    logger.info(f"Added translation cost ${cost_usd:.6f} to session {session_id}")
+                except Exception as e:
+                    logger.error(f"Failed to add translation cost to session: {e}")
+
+        # Step 6: Combine cached and fresh translations
         all_translations = {**cached_translations, **fresh_translations}
 
         # Commit all changes

@@ -10,6 +10,8 @@ from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from services.llm_provider_factory import get_llm_client, LLMProviderFactory
+from services.llm_models.translation_models import TranslationResponse
+from services.cost_service import CostCalculationService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -26,25 +28,6 @@ O4_MINI = "o4-mini"
 MISTRAL_SMALL = "mistral-small-latest"
 MISTRAL_MEDIUM = "mistral-medium-latest"
 MISTRAL_LARGE = "mistral-large-latest"
-
-
-# Pydantic models for structured outputs
-class TranslationEntry(BaseModel):
-    """A single translation entry consisting of [word, grammar_info, context/meaning]."""
-    word: str = Field(description="The translated word or phrase")
-    grammar_info: str = Field(description="Part of speech and gender/tense information")
-    context: str = Field(description="Context or meaning explanation in the native language")
-
-
-class TranslationResponse(BaseModel):
-    """Structured response containing translations for all target languages.
-
-    Each field is a target language name with a list of translation entries.
-    The model is dynamically created based on target_languages parameter.
-    """
-    translations: Dict[str, List[List[str]]] = Field(
-        description="Dictionary where keys are target language names and values are arrays of [translation, grammar_info, context] triplets"
-    )
 
 
 def translate_text(
@@ -212,10 +195,7 @@ Invalid/misspelled word:
 }}
 """
 
-    # Check if model supports structured outputs
-    use_structured_output = provider.supports_structured_output(model)
-
-    # Make API call
+    # Make API call with structured outputs
     try:
         logger.info(f"Translating '{text}' from {source_language} to {target_languages}")
 
@@ -225,126 +205,64 @@ Invalid/misspelled word:
             {"role": "user", "content": user_message}
         ]
 
-        # Prepare response format
-        response_format = None
-        if use_structured_output:
-            # Build dynamic schema with specific language properties
-            language_properties = {}
-            for lang in target_languages:
-                language_properties[lang] = {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "minItems": 3,
-                        "maxItems": 3
-                    }
-                }
-
-            json_schema = {
-                "name": "translation_response",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "word_exists": {
-                            "type": "boolean",
-                            "description": "Whether the word exists and is correctly spelled in the source language"
-                        },
-                        "sent_word": {
-                            "type": "string",
-                            "description": "The original word that was sent"
-                        },
-                        "correct_word": {
-                            "type": "string",
-                            "description": "Suggested correct spelling (empty string if word is valid)"
-                        },
-                        "source_info": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 3,
-                            "maxItems": 3
-                        },
-                        "translations": {
-                            "type": "object",
-                            "properties": language_properties,
-                            "required": target_languages,
-                            "additionalProperties": False
-                        }
-                    },
-                    "required": ["word_exists", "sent_word", "correct_word", "source_info", "translations"],
-                    "additionalProperties": False
-                }
-            }
-            response_format = {
-                "type": "json_schema",
-                "json_schema": json_schema
-            }
-            logger.info(f"Using structured outputs for model {model}")
-        else:
-            # For models that don't support structured outputs, request JSON mode
-            response_format = {"type": "json_object"}
-            logger.info(f"Using JSON mode for model {model}")
-
-        # Call the LLM provider
-        response = provider.create_chat_completion(
+        # Use structured completion with Pydantic model
+        response = provider.create_structured_completion(
             messages=messages,
+            response_model=TranslationResponse,
             model=model,
             temperature=0.2,  # Lower temperature for more consistent spell-checking
-            max_tokens=1000,  # Increased for spell-check fields
-            response_format=response_format
+            max_tokens=1000  # Increased for spell-check fields
         )
 
-        translation_content = response["content"]
+        # Extract parsed object
+        parsed_response = response["parsed_object"]
 
-        # Parse JSON response
-        try:
-            response_data = json.loads(translation_content)
+        # Calculate cost immediately after LLM call
+        cost_usd = CostCalculationService.calculate_cost(
+            provider=provider.get_provider_name(),
+            model=response["model"],
+            prompt_tokens=response["usage"]["prompt_tokens"],
+            completion_tokens=response["usage"]["completion_tokens"],
+            cached_tokens=response["usage"].get("cached_tokens", 0)
+        )
 
-            # Extract spell-check fields (with safe defaults)
-            word_exists = response_data.get("word_exists", True)  # Default to True for safety
-            sent_word = response_data.get("sent_word", text)
-            correct_word = response_data.get("correct_word", "")
+        logger.info(
+            f"Translation successful. Tokens: {response['usage']['total_tokens']}, "
+            f"Cost: ${float(cost_usd):.6f}"
+        )
 
-            translations_dict = response_data.get("translations", {})
-            source_info = response_data.get("source_info", [text, "", ""])
+        # Check if word doesn't exist (spelling issue detected)
+        if not parsed_response.word_exists:
+            logger.warning(
+                f"Spelling issue detected: '{parsed_response.sent_word}' → "
+                f"suggested: '{parsed_response.correct_word}'"
+            )
+            return {
+                "success": True,
+                "spelling_issue": True,
+                "sent_word": parsed_response.sent_word,
+                "correct_word": parsed_response.correct_word,
+                "source_language": source_language,
+                "target_languages": target_languages,
+                "original_text": text,
+                "model": response["model"],
+                "usage": response["usage"],
+                "cost_usd": float(cost_usd)
+            }
 
-            # Check if word doesn't exist (spelling issue detected)
-            if not word_exists:
-                logger.warning(f"Spelling issue detected: '{sent_word}' → suggested: '{correct_word}'")
-                return {
-                    "success": True,
-                    "spelling_issue": True,
-                    "sent_word": sent_word,
-                    "correct_word": correct_word,
-                    "source_language": source_language,
-                    "target_languages": target_languages,
-                    "original_text": text,
-                    "model": model,
-                    "usage": response["usage"]
-                }
-
-            # Fallback if translations not in expected format
-            if not translations_dict and isinstance(response_data, dict):
-                translations_dict = response_data
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse LLM response as JSON: {e}")
-            translations_dict = {target_languages[0]: [[translation_content, "", ""]]}
-            source_info = [text, "", ""]
-
-        logger.info(f"Translation successful. Tokens used: {response['usage']['total_tokens']}")
-
+        # Return successful translation with cost data
         return {
             "success": True,
-            "spelling_issue": False,  # Explicitly set for valid words
+            "spelling_issue": False,
             "original_text": text,
             "source_language": source_language,
             "target_languages": target_languages,
             "native_language": native_language,
-            "source_info": source_info,
-            "translations": translations_dict,
-            "model": model,
-            "usage": response["usage"]
+            "source_info": parsed_response.source_info,
+            "translations": parsed_response.translations,
+            "model": response["model"],
+            "usage": response["usage"],
+            "cost_usd": float(cost_usd)
         }
 
     except Exception as e:
