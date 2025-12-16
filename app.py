@@ -129,6 +129,7 @@ def create_app(config_name=None):
     from models.phrase_translation import PhraseTranslation
     from models.user_learning_progress import UserLearningProgress
     from models.quiz_attempt import QuizAttempt
+    from models.llm_pricing import LLMPricing
 
     # User loader callback for Flask-Login
     @login_manager.user_loader

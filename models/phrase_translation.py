@@ -32,6 +32,14 @@ class PhraseTranslation(db.Model):
     helpful_count = db.Column(db.Integer, default=0)
     unhelpful_count = db.Column(db.Integer, default=0)
 
+    # Cost tracking fields (Phase 2)
+    prompt_tokens = db.Column(db.Integer, default=0)
+    completion_tokens = db.Column(db.Integer, default=0)
+    total_tokens = db.Column(db.Integer, default=0)
+    cached_tokens = db.Column(db.Integer, default=0)
+    estimated_cost_usd = db.Column(db.Numeric(precision=10, scale=6), default=0.0)
+    cost_calculated_at = db.Column(db.DateTime)
+
     # Relationships
     phrase = db.relationship('Phrase', back_populates='translations')
     target_language = db.relationship('Language')

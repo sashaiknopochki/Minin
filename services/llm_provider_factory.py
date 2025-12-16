@@ -6,9 +6,10 @@ Allows easy swapping between providers via environment configuration
 
 import os
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Type
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,52 @@ class LLMProvider(ABC):
     @abstractmethod
     def supports_structured_output(self, model: str) -> bool:
         """Check if the model supports JSON schema structured outputs"""
+        pass
+
+    @abstractmethod
+    def create_structured_completion(
+        self,
+        messages: List[Dict[str, str]],
+        response_model: Type[BaseModel],
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 500,
+        timeout: float = 30.0,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Create a structured completion using Pydantic models.
+
+        Uses provider-specific structured output methods (.parse() for OpenAI/Mistral)
+        with automatic fallback to manual JSON parsing if structured output fails.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            response_model: Pydantic BaseModel class to parse response into
+            model: Model name to use
+            temperature: Sampling temperature (0.0-2.0)
+            max_tokens: Maximum tokens in response
+            timeout: Request timeout in seconds
+            **kwargs: Additional provider-specific parameters
+
+        Returns:
+            Dict containing:
+            - parsed_object: Pydantic model instance
+            - raw_content: Original response text
+            - model: Model name used
+            - usage: Token usage dict with prompt_tokens, completion_tokens, total_tokens, cached_tokens
+            - raw_response: Original API response object
+        """
+        pass
+
+    @abstractmethod
+    def get_provider_name(self) -> str:
+        """
+        Return provider name for cost lookup.
+
+        Returns:
+            Provider name ('openai', 'mistral', etc.)
+        """
         pass
 
 
@@ -131,6 +178,117 @@ class OpenAIProvider(LLMProvider):
     def supports_structured_output(self, model: str) -> bool:
         """Check if model supports JSON schema structured outputs"""
         return model in self.STRUCTURED_OUTPUT_MODELS
+
+    def get_provider_name(self) -> str:
+        """Return provider name for cost lookup"""
+        return "openai"
+
+    def create_structured_completion(
+        self,
+        messages: List[Dict[str, str]],
+        response_model: Type[BaseModel],
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 500,
+        timeout: float = 30.0,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Create structured completion using OpenAI's .parse() method.
+
+        Uses beta.chat.completions.parse() for models that support structured outputs,
+        with automatic fallback to manual JSON parsing if structured output fails.
+        """
+        import json
+
+        try:
+            # Try using structured outputs with .parse() method
+            logger.debug(f"Attempting structured completion with OpenAI model {model}")
+
+            response = self.client.beta.chat.completions.parse(
+                model=model,
+                messages=messages,
+                response_format=response_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+                **kwargs
+            )
+
+            # Extract parsed object
+            parsed_object = response.choices[0].message.parsed
+            raw_content = response.choices[0].message.content
+
+            # Extract cached tokens if available (OpenAI feature)
+            cached_tokens = 0
+            if hasattr(response.usage, 'prompt_tokens_details'):
+                if hasattr(response.usage.prompt_tokens_details, 'cached_tokens'):
+                    cached_tokens = response.usage.prompt_tokens_details.cached_tokens or 0
+
+            result = {
+                "parsed_object": parsed_object,
+                "raw_content": raw_content,
+                "model": response.model,
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                    "cached_tokens": cached_tokens
+                },
+                "raw_response": response
+            }
+
+            logger.info(f"Structured completion successful: {response.model}, tokens={response.usage.total_tokens}")
+            return result
+
+        except Exception as e:
+            logger.warning(f"Structured output failed, falling back to manual JSON parsing: {e}")
+
+            try:
+                # Fallback: use regular chat completion with JSON mode
+                response = self.create_chat_completion(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format={"type": "json_object"},
+                    timeout=timeout,
+                    **kwargs
+                )
+
+                # Parse JSON manually
+                content = response["content"]
+                json_data = json.loads(content)
+                parsed_object = response_model(**json_data)
+
+                # Extract cached tokens (may not be available in fallback)
+                cached_tokens = 0
+                if "raw_response" in response:
+                    raw_resp = response["raw_response"]
+                    if hasattr(raw_resp, 'usage') and hasattr(raw_resp.usage, 'prompt_tokens_details'):
+                        if hasattr(raw_resp.usage.prompt_tokens_details, 'cached_tokens'):
+                            cached_tokens = raw_resp.usage.prompt_tokens_details.cached_tokens or 0
+
+                result = {
+                    "parsed_object": parsed_object,
+                    "raw_content": content,
+                    "model": response["model"],
+                    "usage": {
+                        **response["usage"],
+                        "cached_tokens": cached_tokens
+                    },
+                    "raw_response": response.get("raw_response")
+                }
+
+                logger.info(f"Fallback parsing successful: {response['model']}")
+                return result
+
+            except json.JSONDecodeError as json_err:
+                logger.error(f"JSON parsing failed in fallback: {json_err}")
+                raise RuntimeError(f"Failed to parse LLM response as JSON: {json_err}")
+            except Exception as fallback_err:
+                logger.error(f"Fallback completion failed: {fallback_err}")
+                raise RuntimeError(f"Structured completion failed and fallback also failed: {fallback_err}")
 
 
 class MistralProvider(LLMProvider):
@@ -222,6 +380,108 @@ class MistralProvider(LLMProvider):
     def supports_structured_output(self, model: str) -> bool:
         """Mistral doesn't support full JSON schema yet, only JSON mode"""
         return False
+
+    def get_provider_name(self) -> str:
+        """Return provider name for cost lookup"""
+        return "mistral"
+
+    def create_structured_completion(
+        self,
+        messages: List[Dict[str, str]],
+        response_model: Type[BaseModel],
+        model: str,
+        temperature: float = 0.7,
+        max_tokens: int = 500,
+        timeout: float = 30.0,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Create structured completion using Mistral's .parse() method.
+
+        Mistral recently added chat.parse() support for structured outputs.
+        Falls back to JSON mode with manual parsing if structured output fails.
+        """
+        import json
+
+        try:
+            # Try using Mistral's structured outputs with .parse() method
+            logger.debug(f"Attempting structured completion with Mistral model {model}")
+
+            response = self.client.chat.parse(
+                model=model,
+                messages=messages,
+                response_format=response_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs
+            )
+
+            # Extract parsed object
+            parsed_object = response.choices[0].message.parsed
+            raw_content = response.choices[0].message.content
+
+            # Mistral doesn't support cached tokens yet
+            cached_tokens = 0
+
+            result = {
+                "parsed_object": parsed_object,
+                "raw_content": raw_content,
+                "model": response.model,
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                    "cached_tokens": cached_tokens
+                },
+                "raw_response": response
+            }
+
+            logger.info(f"Structured completion successful: {response.model}, tokens={response.usage.total_tokens}")
+            return result
+
+        except Exception as e:
+            logger.warning(f"Structured output failed, falling back to manual JSON parsing: {e}")
+
+            try:
+                # Fallback: use regular chat completion with JSON mode
+                response = self.create_chat_completion(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format={"type": "json_object"},
+                    timeout=timeout,
+                    **kwargs
+                )
+
+                # Parse JSON manually
+                content = response["content"]
+                json_data = json.loads(content)
+                parsed_object = response_model(**json_data)
+
+                # Mistral doesn't support cached tokens
+                cached_tokens = 0
+
+                result = {
+                    "parsed_object": parsed_object,
+                    "raw_content": content,
+                    "model": response["model"],
+                    "usage": {
+                        **response["usage"],
+                        "cached_tokens": cached_tokens
+                    },
+                    "raw_response": response.get("raw_response")
+                }
+
+                logger.info(f"Fallback parsing successful: {response['model']}")
+                return result
+
+            except json.JSONDecodeError as json_err:
+                logger.error(f"JSON parsing failed in fallback: {json_err}")
+                raise RuntimeError(f"Failed to parse LLM response as JSON: {json_err}")
+            except Exception as fallback_err:
+                logger.error(f"Fallback completion failed: {fallback_err}")
+                raise RuntimeError(f"Structured completion failed and fallback also failed: {fallback_err}")
 
 
 class LLMProviderFactory:

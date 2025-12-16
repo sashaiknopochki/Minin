@@ -29,6 +29,20 @@ class QuizAttempt(db.Model):
 
     attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Cost tracking fields - Question Generation (Phase 2)
+    question_gen_prompt_tokens = db.Column(db.Integer, default=0)
+    question_gen_completion_tokens = db.Column(db.Integer, default=0)
+    question_gen_total_tokens = db.Column(db.Integer, default=0)
+    question_gen_cost_usd = db.Column(db.Numeric(precision=10, scale=6), default=0.0)
+    question_gen_model = db.Column(db.String(50))
+
+    # Cost tracking fields - Answer Evaluation (Phase 2)
+    eval_prompt_tokens = db.Column(db.Integer, default=0)
+    eval_completion_tokens = db.Column(db.Integer, default=0)
+    eval_total_tokens = db.Column(db.Integer, default=0)
+    eval_cost_usd = db.Column(db.Numeric(precision=10, scale=6), default=0.0)
+    eval_model = db.Column(db.String(50))
+
     # Relationships
     user = db.relationship('User', back_populates='quiz_attempts')
     phrase = db.relationship('Phrase', back_populates='quiz_attempts')

@@ -16,6 +16,12 @@ class Session(db.Model):
     started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     ended_at = db.Column(db.DateTime)
 
+    # Cost aggregation fields (Phase 2)
+    total_translation_cost_usd = db.Column(db.Numeric(precision=10, scale=4), default=0.0)
+    total_quiz_cost_usd = db.Column(db.Numeric(precision=10, scale=4), default=0.0)
+    total_cost_usd = db.Column(db.Numeric(precision=10, scale=4), default=0.0)
+    operations_count = db.Column(db.Integer, default=0)
+
     # Relationships
     user = db.relationship('User', back_populates='sessions')
 
