@@ -20,6 +20,9 @@ from models.phrase import Phrase
 from models.phrase_translation import PhraseTranslation
 from models.language import Language
 from services.llm_provider_factory import get_llm_client, LLMProviderFactory
+from services.llm_models.evaluation_models import AnswerEvaluation
+from services.cost_service import CostCalculationService
+from services.session_cost_aggregator import add_quiz_cost
 from dotenv import load_dotenv
 import os
 
@@ -440,30 +443,62 @@ Return ONLY valid JSON, no other text:
 }
 """
 
-            system_message = "You are a fair language learning quiz evaluator. Be lenient with minor errors but strict about meaning. Return only valid JSON."
+            system_message = "You are a fair language learning quiz evaluator. Be lenient with minor errors but strict about meaning."
 
-            # Call LLM provider
-            response = provider.create_chat_completion(
+            # Call LLM provider with structured outputs (Pydantic)
+            response = provider.create_structured_completion(
                 messages=[
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt}
                 ],
+                response_model=AnswerEvaluation,
                 model=DEFAULT_MODEL,
                 temperature=0.3,  # Lower temperature for consistency
                 max_tokens=200,
                 timeout=10.0
             )
 
-            result_text = response["content"].strip()
-            result = json.loads(result_text)
+            # Extract parsed object
+            eval_obj = response["parsed_object"]
+            is_correct = eval_obj.is_correct
+            explanation = eval_obj.explanation
 
-            is_correct = result.get('is_correct', False)
-            explanation = result.get('explanation', 'No explanation provided')
+            # Calculate cost
+            cost_usd = CostCalculationService.calculate_cost(
+                provider=provider.get_provider_name(),
+                model=response["model"],
+                prompt_tokens=response["usage"]["prompt_tokens"],
+                completion_tokens=response["usage"]["completion_tokens"],
+                cached_tokens=response["usage"].get("cached_tokens", 0)
+            )
 
             logger.info(
                 f"LLM evaluation: user_answer='{user_answer}', "
-                f"is_correct={is_correct}, explanation='{explanation}'"
+                f"is_correct={is_correct}, explanation='{explanation}', "
+                f"cost=${float(cost_usd):.6f}"
             )
+
+            # Store evaluation cost in quiz_attempt if available
+            if quiz_attempt:
+                try:
+                    quiz_attempt.eval_prompt_tokens = response["usage"]["prompt_tokens"]
+                    quiz_attempt.eval_completion_tokens = response["usage"]["completion_tokens"]
+                    quiz_attempt.eval_total_tokens = response["usage"]["total_tokens"]
+                    quiz_attempt.eval_cost_usd = float(cost_usd)
+                    quiz_attempt.eval_model = response["model"]
+                    quiz_attempt.llm_evaluation_json = eval_obj.dict()
+
+                    # Note: Don't commit here - let the caller handle the commit
+                    logger.debug(f"Stored evaluation cost data in quiz_attempt {quiz_attempt.id}")
+
+                    # Aggregate cost to session if session_id is available
+                    if quiz_attempt.session_id:
+                        add_quiz_cost(quiz_attempt.session_id, cost_usd)
+                        logger.debug(f"Added evaluation cost to session {quiz_attempt.session_id}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to store evaluation cost data: {str(e)}")
+                    # Don't fail the evaluation if cost tracking fails
 
             return is_correct
 

@@ -343,11 +343,11 @@ def test_evaluate_whitespace_only_user_answer(app_context, quiz_attempt_single_a
 
 def test_evaluate_unsupported_question_type(app_context, test_user, test_phrase, test_learning_progress):
     """Test evaluation with unsupported question type"""
-    # Create quiz attempt with unsupported type
+    # Create quiz attempt with truly unsupported type
     quiz_attempt = QuizAttempt(
         user_id=test_user.id,
         phrase_id=test_phrase.id,
-        question_type='text_input_target',  # Not supported in MVP
+        question_type='invalid_question_type',  # Unsupported type
         prompt_json={"question": "Translate: katze"},
         correct_answer="cat",
         was_correct=False
@@ -355,7 +355,7 @@ def test_evaluate_unsupported_question_type(app_context, test_user, test_phrase,
     db.session.add(quiz_attempt)
     db.session.commit()
 
-    with pytest.raises(ValueError, match="not supported in MVP"):
+    with pytest.raises(ValueError, match="not supported"):
         AnswerEvaluationService.evaluate_answer(
             quiz_attempt_id=quiz_attempt.id,
             user_answer="cat"
