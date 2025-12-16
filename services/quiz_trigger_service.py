@@ -188,8 +188,9 @@ class QuizTriggerService:
                 logger.debug(f"User {user.id} has empty translator_languages list")
                 return None
 
-            # Query for eligible phrase using spaced repetition logic
-            eligible_phrase = UserLearningProgress.query.join(
+            # Query for eligible phrases using spaced repetition logic
+            # Get top 5 most overdue phrases to allow for some variety
+            eligible_phrases = UserLearningProgress.query.join(
                 Phrase, UserLearningProgress.phrase_id == Phrase.id
             ).filter(
                 UserLearningProgress.user_id == user.id,
@@ -199,15 +200,23 @@ class QuizTriggerService:
                 Phrase.is_quizzable == True  # Only quizzable phrases
             ).order_by(
                 UserLearningProgress.next_review_date.asc()  # Oldest first
-            ).first()
+            ).limit(5).all()
 
-            if eligible_phrase:
+            if eligible_phrases:
+                # Select one randomly from the top overdue phrases
+                # This prevents showing the exact same phrase immediately after a skip
+                # if there are multiple due phrases
+                import random
+                eligible_phrase = random.choice(eligible_phrases)
+
                 logger.debug(
                     f"Selected phrase_id={eligible_phrase.phrase_id} for quiz "
-                    f"(user_id={user.id}, stage={eligible_phrase.stage})"
+                    f"(user_id={user.id}, stage={eligible_phrase.stage}) "
+                    f"from {len(eligible_phrases)} candidates"
                 )
             else:
                 logger.debug(f"No eligible phrases found for user_id={user.id}")
+                eligible_phrase = None
 
             return eligible_phrase
 
