@@ -105,7 +105,8 @@ def create_app(config_name=None):
         r"/translation/*": {"origins": ["http://localhost:5173"]},
         r"/quiz/*": {"origins": ["http://localhost:5173"]},
         r"/progress/*": {"origins": ["http://localhost:5173"]},
-        r"/settings/*": {"origins": ["http://localhost:5173"]}
+        r"/settings/*": {"origins": ["http://localhost:5173"]},
+        r"/analytics/*": {"origins": ["http://localhost:5173"]}
     }, supports_credentials=True)
 
     # Initialize SQLAlchemy
@@ -147,12 +148,14 @@ def create_app(config_name=None):
     from routes.quiz import bp as quiz_bp
     from routes.progress import bp as progress_bp
     from routes.settings import bp as settings_bp
+    from routes.analytics import bp as analytics_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(translation_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(progress_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(analytics_bp)
 
     # Home route
     @app.route('/')
