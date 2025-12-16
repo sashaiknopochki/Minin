@@ -10,6 +10,7 @@ import random
 from typing import Optional
 from models import db
 from models.quiz_attempt import QuizAttempt
+from models.user import User
 from models.user_learning_progress import UserLearningProgress
 
 # Configure logging
@@ -101,8 +102,14 @@ class QuizAttemptService:
                 )
 
             # Determine question type based on stage
+            # First fetch user to check preferences
+            user = User.query.get(user_id)
+            if not user:
+                # Should not happen if validation passed earlier, but safe guard
+                logger.warning(f"User {user_id} not found when creating quiz attempt")
+            
             try:
-                question_type = QuizAttemptService.select_question_type(progress.stage)
+                question_type = QuizAttemptService.select_question_type(progress.stage, user)
             except ValueError as e:
                 logger.error(
                     f"Failed to select question type for stage={progress.stage}: {str(e)}"
@@ -146,13 +153,15 @@ class QuizAttemptService:
             raise RuntimeError(f"Failed to create quiz attempt: {str(e)}")
 
     @staticmethod
-    def select_question_type(stage: str) -> str:
+    def select_question_type(stage: str, user: Optional[User] = None) -> str:
         """
-        Select appropriate question type based on learning stage.
+        Select appropriate question type based on learning stage and user preferences.
 
         The question type is randomly selected from a pool of types appropriate
         for the user's current learning stage. This provides variety while
         maintaining appropriate difficulty.
+
+        For Advanced stage, it respects the user's enabled question types.
 
         Question Type Progression:
         - basic: Multiple choice questions (recognition)
@@ -169,32 +178,11 @@ class QuizAttemptService:
             - 'synonym': Identify or provide synonyms
 
         Args:
-            stage (str): Learning stage - 'basic', 'intermediate', 'advanced', or 'mastered'
+            stage (str): Learning stage
+            user (User, optional): User object to check preferences
 
         Returns:
             str: Randomly selected question type from the stage's pool
-
-        Raises:
-            ValueError: If stage is invalid, None, empty, or 'mastered'
-
-        Examples:
-            >>> type1 = QuizAttemptService.select_question_type('basic')
-            >>> type1 in ['multiple_choice_target', 'multiple_choice_source']
-            True
-
-            >>> type2 = QuizAttemptService.select_question_type('intermediate')
-            >>> type2 in ['text_input_target', 'text_input_source']
-            True
-
-            >>> QuizAttemptService.select_question_type('mastered')
-            Traceback (most recent call last):
-                ...
-            ValueError: Invalid stage: mastered
-
-        Notes:
-            - Uses random.choice() for selection to provide variety
-            - Mastered phrases should never reach this function (filtered earlier)
-            - Question types align with cognitive progression: recognition → recall → application
         """
         # Validate stage input
         if not stage or not isinstance(stage, str):
@@ -211,7 +199,7 @@ class QuizAttemptService:
             'basic': ['multiple_choice_target', 'multiple_choice_source'],
             'intermediate': ['text_input_target', 'text_input_source'],
             'advanced': ['contextual', 'definition', 'synonym'],
-            'mastered': []  # Should never reach here
+            'mastered': [] 
         }
 
         types = question_types.get(stage, [])
@@ -226,11 +214,28 @@ class QuizAttemptService:
                 f"Valid stages: {', '.join(valid_stages)}"
             )
 
+        # Apply user preferences for Advanced stage
+        if stage == 'advanced' and user:
+            preferred_types = []
+            if getattr(user, 'enable_contextual_quiz', True):
+                preferred_types.append('contextual')
+            if getattr(user, 'enable_definition_quiz', True):
+                preferred_types.append('definition')
+            if getattr(user, 'enable_synonym_quiz', True):
+                preferred_types.append('synonym')
+            
+            # If user has disabled ALL advanced types, fallback to all types
+            # or ideally fallback to Intermediate, but sticking to stage for now
+            if preferred_types:
+                types = preferred_types
+                logger.debug(f"Filtered advanced types for user {user.id}: {types}")
+            else:
+                logger.warning(f"User {user.id} disabled all advanced types, falling back to all advanced types")
+
         try:
             selected_type = random.choice(types)
             logger.debug(f"Selected question type '{selected_type}' for stage '{stage}'")
             return selected_type
         except IndexError:
-            # This should never happen due to the check above, but defensive programming
             logger.error(f"Unexpected empty types list for stage '{stage}'")
             raise ValueError(f"No question types available for stage: {stage}")
