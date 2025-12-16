@@ -217,6 +217,15 @@ export default function Profile() {
                   </p>
                 </div>
 
+                {/* Info Note */}
+                <div className="rounded-lg bg-muted p-3 text-left">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Note:</strong> If all advanced question types are disabled,
+                    the system will automatically enable them all to ensure you can still
+                    progress to the advanced learning stage.
+                  </p>
+                </div>
+
                 {/* Contextual Questions Toggle */}
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5 text-left">
@@ -292,14 +301,7 @@ export default function Profile() {
                   />
                 </div>
 
-                {/* Info Note */}
-                <div className="rounded-lg bg-muted p-3 text-left">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Note:</strong> If all advanced question types are disabled,
-                    the system will automatically enable them all to ensure you can still
-                    progress to the advanced learning stage.
-                  </p>
-                </div>
+
               </div>
             </CardContent>
           </Card>

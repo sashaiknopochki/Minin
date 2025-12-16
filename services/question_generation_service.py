@@ -960,7 +960,9 @@ Available translations: {json.dumps(translations, ensure_ascii=False)}
 Requirements:
 1. Ask the ENTIRE question in the SOURCE language ({source_lang_name}). Do NOT use English.
 2. User answers in their NATIVE language ({native_lang_name})
-3. Question format (TRANSLATE to {source_lang_name}): "In the sentence '[context_sentence]', what does '{phrase_text}' mean?"
+3. Question format (TRANSLATE to {source_lang_name}): "In the sentence \"[context_sentence]\", what does \"{phrase_text}\" mean?"
+   - USE DOUBLE QUOTES (") for the sentence and the word. Do NOT use single quotes.
+   - END with a question mark "?".
 4. The correct answer must match the context of the sentence
 5. If word has multiple meanings, only the contextually appropriate one is correct
 6. Include the full context sentence (provided or generated) in the question
@@ -1069,7 +1071,11 @@ Available translations with definitions: {json.dumps(translations, ensure_ascii=
 
 Requirements:
 1. Ask the ENTIRE question in the SOURCE language ({source_lang_name}). Do NOT use English.
-2. Question format (TRANSLATE to {source_lang_name}): "Define '{phrase_text}'" or "What does '{phrase_text}' mean?"
+2. Question format (TRANSLATE to {source_lang_name}): "Describe the meaning of \"{phrase_text}\"" or "Define the word \"{phrase_text}\""
+   - USE DOUBLE QUOTES (") for the word. Do NOT use single quotes.
+   - END with a period "." or question mark "?" as appropriate.
+   - Avoid "What does ... mean" as it sounds like asking for translation.
+   - Use phrasing like "Erkläre ..." (Explain) or "Definiere ..." (Define).
 3. Extract the definition from translations_json to use as reference answer
 4. **CRITICAL**: The correct_answer should be a definition IN THE SOURCE LANGUAGE ({source_lang_name}), NOT a translation
 5. This tests deep understanding - user must explain the word in the language they're learning
@@ -1078,7 +1084,7 @@ Requirements:
 
 Return format:
 {{
-  "question": "[Question in {source_lang_name} asking for definition of '{phrase_text}']",
+  "question": "[Question in {source_lang_name} asking for definition of \"{phrase_text}\"]",
   "correct_answer": "definition in source language" or ["definition 1", "definition 2"],
   "question_language": "{phrase_language}",
   "answer_language": "{phrase_language}"
@@ -1185,7 +1191,9 @@ Available translations with related words: {json.dumps(translations, ensure_asci
 
 Requirements:
 1. Ask the ENTIRE question in the SOURCE language ({source_lang_name}). Do NOT use English.
-2. Question format (TRANSLATE to {source_lang_name}): "Provide a synonym for '{phrase_text}'"
+2. Question format (TRANSLATE to {source_lang_name}): "Provide a synonym for \"{phrase_text}\"."
+   - USE DOUBLE QUOTES (") for the word. Do NOT use single quotes.
+   - END with a period "." or question mark "?" as appropriate.
 3. Use the word "synonym" (translated if appropriate) to make it clear we want a word in the SAME language
 4. Extract related words/synonyms from translations_json
 5. **CRITICAL**: The correct_answer should be synonyms IN THE SOURCE LANGUAGE ({source_lang_name}), NOT translations
@@ -1196,7 +1204,7 @@ Requirements:
 
 Return format:
 {{
-  "question": "[Question in {source_lang_name} asking for synonym of '{phrase_text}']",
+  "question": "[Question in {source_lang_name} asking for synonym of \"{phrase_text}\"]",
   "correct_answer": ["synonym1", "synonym2", "synonym3"],
   "question_language": "{phrase_language}",
   "answer_language": "{phrase_language}"
