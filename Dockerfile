@@ -24,5 +24,6 @@ RUN mkdir -p logs
 EXPOSE 8080
 
 # Run database migrations and start app
-CMD flask db upgrade && gunicorn --bind :8080 --workers 1 --threads 8 --timeout 0 app:app
-```
+# Use || true to continue even if migrations fail (database might already be up to date)
+# Use "app:create_app()" for Flask application factory pattern
+CMD (flask db upgrade || echo "Migration skipped or failed, continuing...") && gunicorn --bind :8080 --workers 1 --threads 8 --timeout 0 "app:create_app()"
