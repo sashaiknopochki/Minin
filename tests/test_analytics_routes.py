@@ -13,7 +13,7 @@ from models import db
 from models.user import User
 from models.session import Session
 from services.session_cost_aggregator import add_translation_cost, add_quiz_cost
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import uuid
 import json
@@ -192,7 +192,7 @@ class TestMonthlyCotsEndpoint:
             assert response.status_code == 200
 
             data = json.loads(response.data)
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             assert data['year'] == now.year
             assert data['month'] == now.month
 
@@ -228,7 +228,7 @@ class TestCurrentMonthEndpoint:
         """Test getting current month costs"""
         with app.app_context():
             # Create session for current month
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             create_test_session_with_costs(
                 test_user.id, now.year, now.month,
                 translation_cost=0.0234,
@@ -252,7 +252,7 @@ class TestCostHistoryEndpoint:
     def test_get_cost_history_default_6_months(self, authenticated_client, test_user, app):
         """Test getting cost history with default 6 months"""
         with app.app_context():
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Create sessions for the last 6 months
             for i in range(6):

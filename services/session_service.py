@@ -1,6 +1,6 @@
 """Session management service for tracking user translation sessions"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from models import db
 from models.session import Session
@@ -30,7 +30,7 @@ def create_session(user_id: int) -> Session:
     new_session = Session(
         session_id=session_id,
         user_id=user_id,
-        started_at=datetime.utcnow()
+        started_at=datetime.now(timezone.utc)
     )
 
     db.session.add(new_session)
@@ -88,7 +88,7 @@ def end_session(session_id: str) -> Optional[Session]:
     if not session:
         return None
 
-    session.ended_at = datetime.utcnow()
+    session.ended_at = datetime.now(timezone.utc)
     db.session.commit()
 
     return session

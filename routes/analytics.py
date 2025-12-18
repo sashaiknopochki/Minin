@@ -7,7 +7,7 @@ Includes monthly cost reporting, session statistics, and usage trends.
 
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from datetime import datetime
+from datetime import datetime, timezone
 from services.cost_service import CostCalculationService
 import logging
 
@@ -60,7 +60,7 @@ def get_monthly_costs():
     """
     try:
         # Get year and month from query params, default to current month
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         year = request.args.get('year', type=int)
         if year is None:
             year = now.year
@@ -133,7 +133,7 @@ def get_current_month_costs():
         GET /analytics/costs/current
     """
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         costs = CostCalculationService.get_monthly_cost(current_user.id, now.year, now.month)
 
         response = {
@@ -201,7 +201,7 @@ def get_cost_history():
             }), 400
 
         # Generate list of months to query
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         current_year = now.year
         current_month = now.month
 

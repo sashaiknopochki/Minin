@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import validates
 
 
@@ -12,7 +12,7 @@ class Phrase(db.Model):
     text = db.Column(db.String, nullable=False)
     language_code = db.Column(db.String(2), db.ForeignKey('languages.code'), nullable=False, index=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # word, phrase, phrasal_verb, example_sentence
     type = db.Column(db.String, default='word')

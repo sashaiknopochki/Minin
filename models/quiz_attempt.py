@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class QuizAttempt(db.Model):
@@ -27,7 +27,7 @@ class QuizAttempt(db.Model):
     # Optional: store LLM evaluation for debugging
     llm_evaluation_json = db.Column(db.JSON)
 
-    attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    attempted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Cost tracking fields - Question Generation (Phase 2)
     question_gen_prompt_tokens = db.Column(db.Integer, default=0)

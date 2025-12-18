@@ -11,7 +11,7 @@ This service implements the multi-target-language caching strategy:
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from models import db
 from models.phrase import Phrase
@@ -158,7 +158,7 @@ def cache_translation(
             existing.model_name = model_name
             existing.model_version = model_version
             existing.prompt_hash = prompt_hash
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
 
             # Update cost tracking fields
             if cost_usd is not None:
@@ -167,7 +167,7 @@ def cache_translation(
                 existing.total_tokens = total_tokens
                 existing.cached_tokens = cached_tokens
                 existing.estimated_cost_usd = float(cost_usd)
-                existing.cost_calculated_at = datetime.utcnow()
+                existing.cost_calculated_at = datetime.now(timezone.utc)
 
             db.session.flush()
             return existing
@@ -185,7 +185,7 @@ def cache_translation(
             total_tokens=total_tokens,
             cached_tokens=cached_tokens,
             estimated_cost_usd=float(cost_usd) if cost_usd is not None else 0.0,
-            cost_calculated_at=datetime.utcnow() if cost_usd is not None else None
+            cost_calculated_at=datetime.now(timezone.utc) if cost_usd is not None else None
         )
 
         db.session.add(translation)

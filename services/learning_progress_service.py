@@ -1,7 +1,7 @@
 """Learning Progress Service - Manages user learning progress tracking for spaced repetition"""
 import logging
 from typing import Optional
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from models import db
 from models.user_learning_progress import UserLearningProgress
 from models.user_searches import UserSearch
@@ -110,8 +110,8 @@ def create_initial_progress(user_id: int, phrase_id: int) -> Optional[UserLearni
             times_correct=0,
             times_incorrect=0,
             next_review_date=date.today(),  # Eligible for quiz immediately
-            first_seen_at=datetime.utcnow(),
-            created_at=datetime.utcnow()
+            first_seen_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc)
         )
 
         db.session.add(progress)
@@ -330,7 +330,7 @@ def update_after_quiz(quiz_attempt_id: int) -> dict:
         else:
             progress.times_incorrect += 1
 
-        progress.last_reviewed_at = datetime.utcnow()
+        progress.last_reviewed_at = datetime.now(timezone.utc)
 
         # Check for stage advancement
         old_stage = progress.stage

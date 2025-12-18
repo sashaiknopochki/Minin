@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_login import UserMixin
 from sqlalchemy.orm import validates
 import re
@@ -34,7 +34,7 @@ class User(UserMixin, db.Model):
     enable_definition_quiz = db.Column(db.Boolean, default=True)
     enable_synonym_quiz = db.Column(db.Boolean, default=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_active_at = db.Column(db.DateTime)
 
     # Relationships

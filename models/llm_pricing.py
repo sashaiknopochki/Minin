@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 
@@ -30,7 +30,7 @@ class LLMPricing(db.Model):
     # Optional notes about this pricing tier or changes
     notes = db.Column(db.Text, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Unique constraint on (provider, model_name, effective_date)
     __table_args__ = (

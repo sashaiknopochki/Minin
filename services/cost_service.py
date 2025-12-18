@@ -6,7 +6,7 @@ Includes caching of pricing data and monthly cost aggregation queries.
 """
 
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 from functools import lru_cache
 import logging
@@ -30,14 +30,14 @@ class PricingCache:
     def get(self, key):
         if key in self.cache:
             value, timestamp = self.cache[key]
-            if datetime.utcnow() - timestamp < timedelta(seconds=self.ttl_seconds):
+            if datetime.now(timezone.utc) - timestamp < timedelta(seconds=self.ttl_seconds):
                 return value
             else:
                 del self.cache[key]
         return None
 
     def set(self, key, value):
-        self.cache[key] = (value, datetime.utcnow())
+        self.cache[key] = (value, datetime.now(timezone.utc))
 
     def clear(self):
         """Clear all cached entries"""
@@ -147,7 +147,7 @@ class CostCalculationService:
                 and_(
                     LLMPricing.provider == provider,
                     LLMPricing.model_name == model,
-                    LLMPricing.effective_date <= datetime.utcnow()
+                    LLMPricing.effective_date <= datetime.now(timezone.utc)
                 )
             ).order_by(LLMPricing.effective_date.desc()).first()
 

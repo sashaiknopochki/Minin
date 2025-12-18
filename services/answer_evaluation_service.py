@@ -11,7 +11,7 @@ MVP implementation uses simple exact matching for multiple choice questions.
 import json
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from models import db
 from models.quiz_attempt import QuizAttempt
@@ -583,7 +583,7 @@ Return ONLY valid JSON, no other text:
             else:
                 progress.times_incorrect += 1
 
-            progress.last_reviewed_at = datetime.utcnow()
+            progress.last_reviewed_at = datetime.now(timezone.utc)
 
             db.session.commit()
 

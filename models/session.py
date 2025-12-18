@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import validates
 import uuid
 
@@ -13,7 +13,7 @@ class Session(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
 
-    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    started_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     ended_at = db.Column(db.DateTime)
 
     # Cost aggregation fields (Phase 2)

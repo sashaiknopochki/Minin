@@ -15,7 +15,7 @@ from models.user_learning_progress import UserLearningProgress
 from models.quiz_attempt import QuizAttempt
 from models.session import Session
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Create app with test configuration
 app = create_app('testing')
@@ -121,7 +121,7 @@ try:
         session = Session(
             session_id=str(uuid4()),
             user_id=user.id,
-            started_at=datetime.utcnow()  # Fixed: Use Python datetime, not SQL function
+            started_at=datetime.now(timezone.utc)  # Fixed: Use Python datetime, not SQL function
         )
         db.session.add(session)
         db.session.commit()

@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class UserSearch(db.Model):
@@ -11,7 +11,7 @@ class UserSearch(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     phrase_id = db.Column(db.Integer, db.ForeignKey('phrases.id'), nullable=False, index=True)
 
-    searched_at = db.Column(db.DateTime, default=datetime.utcnow)
+    searched_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # UUID for grouping searches in same session
     session_id = db.Column(db.String(36), db.ForeignKey('sessions.session_id'), index=True)

@@ -1,7 +1,7 @@
 from models import db
 from models.user import User
 from flask_login import current_user
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def get_or_create_user(google_id, email, name):
 
         if user:
             # Update last active timestamp
-            user.last_active_at = datetime.utcnow()
+            user.last_active_at = datetime.now(timezone.utc)
             db.session.commit()
             return user
 
@@ -39,7 +39,7 @@ def get_or_create_user(google_id, email, name):
             quiz_frequency=5,  # Default quiz frequency
             quiz_mode_enabled=True,
             searches_since_last_quiz=0,
-            last_active_at=datetime.utcnow()
+            last_active_at=datetime.now(timezone.utc)
         )
 
         db.session.add(user)

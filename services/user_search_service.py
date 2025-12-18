@@ -1,7 +1,7 @@
 """User Search Service - Logs user translation searches to the database"""
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from models import db
 from models.phrase import Phrase
 from models.user_searches import UserSearch
@@ -99,7 +99,7 @@ def log_user_search(
         user_search = UserSearch(
             user_id=user_id,
             phrase_id=phrase.id,
-            searched_at=datetime.utcnow(),
+            searched_at=datetime.now(timezone.utc),
             session_id=session_id,
             context_sentence=context_sentence,
             llm_translations_json=translations  # Store the translations dict as JSON

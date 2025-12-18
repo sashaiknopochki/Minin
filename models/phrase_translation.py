@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class PhraseTranslation(db.Model):
@@ -25,8 +25,8 @@ class PhraseTranslation(db.Model):
     # Optional: hash of the prompt used
     prompt_hash = db.Column(db.String)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, onupdate=lambda: datetime.now(timezone.utc))
 
     # User feedback for quality tracking
     helpful_count = db.Column(db.Integer, default=0)

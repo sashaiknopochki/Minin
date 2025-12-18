@@ -1,5 +1,5 @@
 from models import db
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 
 class UserLearningProgress(db.Model):
@@ -21,10 +21,10 @@ class UserLearningProgress(db.Model):
     next_review_date = db.Column(db.Date, nullable=True, default=None)
     last_reviewed_at = db.Column(db.DateTime)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Track when user first encountered this phrase (for velocity calculation)
-    first_seen_at = db.Column(db.DateTime, default=datetime.utcnow)
+    first_seen_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user = db.relationship('User', back_populates='learning_progress')
@@ -48,7 +48,7 @@ class UserLearningProgress(db.Model):
         """Calculate days from first seen to current stage (velocity metric)"""
         if not self.first_seen_at:
             return None
-        delta = datetime.utcnow() - self.first_seen_at
+        delta = datetime.now(timezone.utc) - self.first_seen_at
         return delta.days
 
     def __repr__(self):
