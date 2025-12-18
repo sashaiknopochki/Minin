@@ -4,87 +4,6 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from config import config
 import os
-import logging
-from logging.handlers import RotatingFileHandler
-
-
-def configure_logging(app):
-    """
-    Configure application logging with file rotation and console output.
-
-    Sets up two handlers:
-    1. File handler: Writes to logs/minin.log with 10MB rotation
-    2. Console handler: Always writes to stdout (visible in terminal)
-
-    Log levels:
-    - Development: DEBUG (all messages)
-    - Production: INFO (info, warning, error)
-
-    Features:
-    - Automatic log file rotation (keeps last 10 files)
-    - Timestamps and source location in logs
-    - Color-coded console output in development
-    """
-    # Create logs directory if it doesn't exist
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-
-    # Configure log format with timestamp, level, and location
-    file_formatter = logging.Formatter(
-        '%(asctime)s %(levelname)-8s [%(name)s:%(lineno)d] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-
-    console_formatter = logging.Formatter(
-        '%(levelname)-8s [%(name)s] %(message)s'
-    )
-
-    # File handler with rotation (10MB max, keep 10 backup files)
-    file_handler = RotatingFileHandler(
-        'logs/minin.log',
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=10,
-        encoding='utf-8'
-    )
-    file_handler.setFormatter(file_formatter)
-    file_handler.setLevel(logging.DEBUG)  # Log everything to file
-
-    # Console handler (always enabled, even in production)
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(console_formatter)
-
-    # Set log level based on environment
-    if app.debug:
-        # Development: show DEBUG and above in console and file
-        console_handler.setLevel(logging.DEBUG)
-        app.logger.setLevel(logging.DEBUG)
-        app.logger.info("Logging configured for DEVELOPMENT mode (DEBUG level)")
-    else:
-        # Production: show INFO and above in console, DEBUG in file
-        console_handler.setLevel(logging.INFO)
-        app.logger.setLevel(logging.INFO)
-        app.logger.info("Logging configured for PRODUCTION mode (INFO level)")
-
-    # Remove default handlers to avoid duplicate logs
-    app.logger.handlers.clear()
-
-    # Add our handlers
-    app.logger.addHandler(file_handler)
-    app.logger.addHandler(console_handler)
-
-    # Also configure root logger for service modules
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG if app.debug else logging.INFO)
-    root_logger.handlers.clear()
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(console_handler)
-
-    # Log startup message
-    app.logger.info("=" * 60)
-    app.logger.info(f"Minin Application Starting")
-    app.logger.info(f"Environment: {os.getenv('FLASK_ENV', 'development')}")
-    app.logger.info(f"Log file: {os.path.abspath('logs/minin.log')}")
-    app.logger.info("=" * 60)
 
 
 def create_app(config_name=None):
@@ -95,18 +14,18 @@ def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
-    # Configure logging (must be done early)
-    configure_logging(app)
+    Initialize CORS for React frontend
 
-    # Initialize CORS for React frontend
+    # Get allowed origins from environment variable
+    ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+
     CORS(app, resources={
-        r"/api/*": {"origins": ["http://localhost:5173"]},
-        r"/auth/*": {"origins": ["http://localhost:5173"]},
-        r"/translation/*": {"origins": ["http://localhost:5173"]},
-        r"/quiz/*": {"origins": ["http://localhost:5173"]},
-        r"/progress/*": {"origins": ["http://localhost:5173"]},
-        r"/settings/*": {"origins": ["http://localhost:5173"]},
-        r"/analytics/*": {"origins": ["http://localhost:5173"]}
+        r"/api/*": {"origins": ALLOWED_ORIGINS},
+        r"/auth/*": {"origins": ALLOWED_ORIGINS},
+        r"/translation/*": {"origins": ALLOWED_ORIGINS},
+        r"/quiz/*": {"origins": ALLOWED_ORIGINS},
+        r"/progress/*": {"origins": ALLOWED_ORIGINS},
+        r"/settings/*": {"origins": ALLOWED_ORIGINS}
     }, supports_credentials=True)
 
     # Initialize SQLAlchemy
@@ -130,7 +49,6 @@ def create_app(config_name=None):
     from models.phrase_translation import PhraseTranslation
     from models.user_learning_progress import UserLearningProgress
     from models.quiz_attempt import QuizAttempt
-    from models.llm_pricing import LLMPricing
 
     # User loader callback for Flask-Login
     @login_manager.user_loader
@@ -148,14 +66,12 @@ def create_app(config_name=None):
     from routes.quiz import bp as quiz_bp
     from routes.progress import bp as progress_bp
     from routes.settings import bp as settings_bp
-    from routes.analytics import bp as analytics_bp
 
     app.register_blueprint(api_bp)
     app.register_blueprint(translation_bp)
     app.register_blueprint(quiz_bp)
     app.register_blueprint(progress_bp)
     app.register_blueprint(settings_bp)
-    app.register_blueprint(analytics_bp)
 
     # Home route
     @app.route('/')
@@ -165,8 +81,19 @@ def create_app(config_name=None):
             'version': '1.0.0'
         })
 
+    # Health check route
+    @app.route('/health')
+    def health_check():
+        try:
+            db.session.execute(db.text('SELECT 1'))
+            return jsonify({'status': 'healthy', 'database': 'connected'}), 200
+        except Exception as e:
+            app.logger.error(f"Health check failed: {e}")
+            return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
     return app
 
+    return app
 
 if __name__ == '__main__':
     app = create_app()
