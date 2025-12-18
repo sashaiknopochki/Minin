@@ -11,8 +11,15 @@ class Config:
     DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
     # SQLAlchemy configuration
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI', 'sqlite:///database.db')
+    # SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI', 'sqlite:///database.db')
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URI')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 20,
+        'max_overflow': 10,  # Can temporarily create 5 extra connections
+        'pool_recycle': 3600,
+        'pool_pre_ping': True
+    }
 
     # Session security
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie

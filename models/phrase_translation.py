@@ -10,8 +10,8 @@ class PhraseTranslation(db.Model):
 
     phrase_id = db.Column(db.Integer, db.ForeignKey('phrases.id'), nullable=False)
 
-    # Target language for this translation (e.g., 'en' for English translation of German word)
-    target_language_code = db.Column(db.String(2), db.ForeignKey('languages.code'), nullable=False)
+    # Target language for this translation (e.g., 'en', 'zh-CN' for locale-specific translations)
+    target_language_code = db.Column(db.String(10), db.ForeignKey('languages.code'), nullable=False)
 
     # LLM response: definitions, examples, synonyms
     translations_json = db.Column(db.JSON, nullable=False)
