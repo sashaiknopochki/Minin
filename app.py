@@ -47,6 +47,18 @@ def create_app(config_name=None):
     login_manager.init_app(app)
     login_manager.login_view = "auth.google_login"
 
+    # Configure Flask-Login to return JSON errors instead of redirects for API endpoints
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        """Return JSON error instead of redirect for unauthorized API requests"""
+        return jsonify(
+            {
+                "success": False,
+                "error": "Authentication required",
+                "message": "Please log in to access this resource",
+            }
+        ), 401
+
     # Import all models to ensure they are registered with SQLAlchemy
     from models.language import Language
     from models.phrase import Phrase
