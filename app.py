@@ -25,6 +25,7 @@ def create_app(config_name=None):
         resources={
             r"/api/*": {"origins": ALLOWED_ORIGINS},
             r"/auth/*": {"origins": ALLOWED_ORIGINS},
+            r"/login/*": {"origins": ALLOWED_ORIGINS},
             r"/translation/*": {"origins": ALLOWED_ORIGINS},
             r"/quiz/*": {"origins": ALLOWED_ORIGINS},
             r"/progress/*": {"origins": ALLOWED_ORIGINS},
