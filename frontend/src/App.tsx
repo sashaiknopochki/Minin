@@ -56,19 +56,35 @@ function App() {
           path="/login"
           element={user ? <Navigate to="/translate" replace /> : <Login />}
         />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
+        <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/translate" replace />} />
+          {/* Public route - accessible to everyone */}
           <Route path="translate" element={<Translate />} />
-          <Route path="practice" element={<Practice />} />
-          <Route path="history" element={<History />} />
-          <Route path="profile" element={<Profile />} />
+          {/* Protected routes - require authentication */}
+          <Route
+            path="practice"
+            element={
+              <ProtectedRoute>
+                <Practice />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="history"
+            element={
+              <ProtectedRoute>
+                <History />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
         </Route>
         <Route path="*" element={<Navigate to="/translate" replace />} />
       </Routes>
