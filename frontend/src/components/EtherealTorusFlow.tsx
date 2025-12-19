@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 // themes: source follows itself, ever-flowing nature, return to source
 // visualization: Particles flow in an eternal cycle, always returning to their origin
@@ -6,23 +6,23 @@ import { useEffect, useRef, useState } from 'react';
 const EtherealTorusFlow = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDarkMode, setIsDarkMode] = useState(
-    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
 
   // Listen for theme changes
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     // Set canvas size according to project requirements
@@ -33,17 +33,42 @@ const EtherealTorusFlow = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Particle storage
-    const particles = [];
+    const particles: Particle[] = [];
     // Slightly increase particle count for smoother appearance at slower speeds
     const numParticles = 48000;
     let time = 0;
 
     // Determine particle color based on theme
-    const particleColor = isDarkMode ? '240, 240, 240' : '40, 40, 40';
+    const particleColor = isDarkMode ? "240, 240, 240" : "40, 40, 40";
 
     // Particle class
     class Particle {
+      u: number;
+      v: number;
+      R: number;
+      r: number;
+      size: number;
+      opacity: number;
+      speed: number;
+      phase: number;
+      x: number;
+      y: number;
+      displaySize: number;
+      displayOpacity: number;
+
       constructor() {
+        this.u = 0;
+        this.v = 0;
+        this.R = 0;
+        this.r = 0;
+        this.size = 0;
+        this.opacity = 0;
+        this.speed = 0;
+        this.phase = 0;
+        this.x = 0;
+        this.y = 0;
+        this.displaySize = 0;
+        this.displayOpacity = 0;
         this.reset();
       }
 
@@ -77,8 +102,8 @@ const EtherealTorusFlow = () => {
 
         // Simple 3D to 2D projection
         const scale = 1000 / (1000 + z);
-        this.x = x * scale + canvas.width / 2;
-        this.y = y * scale + canvas.height / 2;
+        this.x = x * scale + canvas!.width / 2;
+        this.y = y * scale + canvas!.height / 2;
 
         // Adjust size based on depth
         this.displaySize = this.size * scale;
@@ -88,10 +113,10 @@ const EtherealTorusFlow = () => {
       }
 
       draw() {
-        ctx.fillStyle = `rgba(${particleColor}, ${this.displayOpacity})`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.displaySize, 0, Math.PI * 2);
-        ctx.fill();
+        ctx!.fillStyle = `rgba(${particleColor}, ${this.displayOpacity})`;
+        ctx!.beginPath();
+        ctx!.arc(this.x, this.y, this.displaySize, 0, Math.PI * 2);
+        ctx!.fill();
       }
     }
 
@@ -104,10 +129,10 @@ const EtherealTorusFlow = () => {
     let lastFrameTime = 0;
     const targetFPS = 20; // Equivalent to 50ms setInterval
     const frameInterval = 1000 / targetFPS;
-    let animationFrameId = null;
+    let animationFrameId: number | null = null;
 
     // Animation function with time delta control
-    function animate(currentTime) {
+    function animate(currentTime: number) {
       // Initialize lastFrameTime on first frame
       if (!lastFrameTime) {
         lastFrameTime = currentTime;
@@ -118,13 +143,13 @@ const EtherealTorusFlow = () => {
       // Only update animation when enough time has passed (mimics setInterval at 100ms)
       if (deltaTime >= frameInterval) {
         // Clear canvas to show page background
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
 
         // Set time increment for animation speed
         time += 0.004;
 
         // Update and draw particles
-        particles.forEach(particle => {
+        particles.forEach((particle) => {
           particle.update();
           particle.draw();
         });
@@ -159,18 +184,19 @@ const EtherealTorusFlow = () => {
   }, [isDarkMode]);
 
   return (
-      <div style={{
-        width: '100%',
-        maxWidth: '1500px',
-        height: '900px',
-        borderRadius: '8px',
-        margin: '0 auto',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-
-      }}>
-        <canvas ref={canvasRef} style={{ maxWidth: '100%', height: 'auto' }} />
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "1500px",
+        height: "900px",
+        borderRadius: "8px",
+        margin: "0 auto",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <canvas ref={canvasRef} style={{ maxWidth: "100%", height: "auto" }} />
     </div>
   );
 };

@@ -4,6 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { apiFetch } from "@/lib/api";
 
+// Use the same CredentialResponse type from GoogleSignInButton
+interface CredentialResponse {
+  credential: string;
+}
+
 export default function Login() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
@@ -16,9 +21,7 @@ export default function Login() {
   }, [user, navigate]);
 
   // Handle Google Sign-In success
-  const handleGoogleSignIn = async (
-    response: google.accounts.id.CredentialResponse,
-  ) => {
+  const handleGoogleSignIn = async (response: CredentialResponse) => {
     try {
       const result = await apiFetch("/auth/google", {
         method: "POST",

@@ -67,7 +67,7 @@ export default function Translate() {
   const [quizLoading, setQuizLoading] = useState(false);
 
   // Debounce timer ref
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
 
   // Get browser/OS language
   const getBrowserLanguage = (): string => {

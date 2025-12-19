@@ -1,21 +1,43 @@
 import { useEffect, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-
-interface GoogleSignInButtonProps {
-  onSuccess?: (response: google.accounts.id.CredentialResponse) => void;
-  onError?: () => void;
-}
 
 // Extend the Window interface to include google
 declare global {
   interface Window {
-    google?: typeof google;
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: CredentialResponse) => void;
+            error_callback?: () => void;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme: string;
+              size: string;
+              width: number;
+              text: string;
+            },
+          ) => void;
+        };
+      };
+    };
   }
+
+  interface CredentialResponse {
+    credential: string;
+  }
+}
+
+interface GoogleSignInButtonProps {
+  onSuccess?: (response: CredentialResponse) => void;
+  onError?: () => void;
 }
 
 export default function GoogleSignInButton({
   onSuccess,
-  onError
+  onError,
 }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null);
 
@@ -24,8 +46,9 @@ export default function GoogleSignInButton({
     const initializeGoogleSignIn = () => {
       if (window.google && buttonRef.current) {
         window.google.accounts.id.initialize({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID",
-          callback: (response: google.accounts.id.CredentialResponse) => {
+          client_id:
+            import.meta.env.VITE_GOOGLE_CLIENT_ID || "YOUR_GOOGLE_CLIENT_ID",
+          callback: (response: CredentialResponse) => {
             if (onSuccess) {
               onSuccess(response);
             }
@@ -37,15 +60,12 @@ export default function GoogleSignInButton({
           },
         });
 
-        window.google.accounts.id.renderButton(
-          buttonRef.current,
-          {
-            theme: "outline",
-            size: "large",
-            width: buttonRef.current.offsetWidth,
-            text: "signin_with",
-          }
-        );
+        window.google.accounts.id.renderButton(buttonRef.current, {
+          theme: "outline",
+          size: "large",
+          width: buttonRef.current.offsetWidth,
+          text: "signin_with",
+        });
       }
     };
 
