@@ -49,6 +49,12 @@ class ProductionConfig(Config):
     # The cookie will be tied to the backend domain (GCP) only
     # Frontend must use credentials: 'include' in all fetch requests
 
+    # Flask-Login specific cookie settings
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SECURE = True
+    REMEMBER_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "None")
+    REMEMBER_COOKIE_DURATION = 2592000  # 30 days in seconds
+
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": 20,
         "max_overflow": 10,  # Can temporarily create 5 extra connections
