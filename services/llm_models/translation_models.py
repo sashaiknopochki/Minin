@@ -5,15 +5,19 @@ Structured output models for LLM translation operations.
 These models define the expected JSON structure for translation responses.
 """
 
+from typing import Dict, List
+
 from pydantic import BaseModel, Field
-from typing import List, Dict
 
 
 class TranslationEntry(BaseModel):
     """A single translation entry consisting of [word, grammar_info, context/meaning]."""
+
     word: str = Field(description="The translated word or phrase")
     grammar_info: str = Field(description="Part of speech and gender/tense information")
-    context: str = Field(description="Context or meaning explanation in the native language")
+    context: str = Field(
+        description="Context or meaning explanation in the native language"
+    )
 
 
 class TranslationResponse(BaseModel):
@@ -36,13 +40,18 @@ class TranslationResponse(BaseModel):
         }
     }
     """
-    word_exists: bool = Field(description="Whether the word exists and is correctly spelled in the source language")
+
+    word_exists: bool = Field(
+        description="Whether the word exists and is correctly spelled in the source language"
+    )
     sent_word: str = Field(description="The original word that was sent")
-    correct_word: str = Field(description="Suggested correct spelling (empty string if word is valid)")
+    correct_word: str = Field(
+        description="Suggested correct spelling (empty string if word is valid)"
+    )
     source_info: List[str] = Field(
-        description="Array with 3 elements: [source_word, grammar_info, context/meaning]",
-        min_length=3,
-        max_length=3
+        description="Array with 3 elements: [source_word, grammar_info, context/meaning]. Empty array if word doesn't exist.",
+        min_length=0,
+        max_length=3,
     )
     translations: Dict[str, List[List[str]]] = Field(
         description="Dictionary where keys are target language names and values are arrays of [translation, grammar_info, context] triplets"
