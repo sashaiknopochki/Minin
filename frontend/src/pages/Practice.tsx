@@ -1,91 +1,99 @@
-import { useState, useEffect } from "react"
-import { useSearchParams } from "react-router-dom"
-import { Button } from "@/components/ui/button"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Card, CardContent } from "@/components/ui/card"
-import { QuizQuestion, type QuizData, type QuizResult } from "@/components/QuizQuestion"
-import { useAuth } from "@/contexts/AuthContext"
-import { useLanguageContext } from "@/contexts/LanguageContext"
-import { Loader2 } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  QuizQuestion,
+  type QuizData,
+  type QuizResult,
+} from "@/components/QuizQuestion";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguageContext } from "@/contexts/LanguageContext";
+import { Loader2 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 export default function Practice() {
-  const { user } = useAuth()
-  const { getLanguageName } = useLanguageContext()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const { user } = useAuth();
+  const { getLanguageName } = useLanguageContext();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Get filter values from URL params
-  const selectedStage = searchParams.get("stage") || "all"
-  const selectedLanguage = searchParams.get("language") || "all"
-  const dueForReview = searchParams.get("due") === "true"
+  const selectedStage = searchParams.get("stage") || "all";
+  const selectedLanguage = searchParams.get("language") || "all";
+  const dueForReview = searchParams.get("due") === "true";
 
   // Quiz state
-  const [quizData, setQuizData] = useState<QuizData | null>(null)
-  const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [totalCount, setTotalCount] = useState(0)
-  const [currentPosition, setCurrentPosition] = useState(0)
+  const [quizData, setQuizData] = useState<QuizData | null>(null);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPosition, setCurrentPosition] = useState(0);
 
   // Session tracking
-  const [seenPhraseIds, setSeenPhraseIds] = useState<number[]>([])
-  const [sessionComplete, setSessionComplete] = useState(false)
+  const [seenPhraseIds, setSeenPhraseIds] = useState<number[]>([]);
+  const [sessionComplete, setSessionComplete] = useState(false);
 
   // User languages
-  const userLanguages = user?.translator_languages || []
-  const primaryLanguage = user?.primary_language_code || "en"
+  const userLanguages = user?.translator_languages || [];
+  const primaryLanguage = user?.primary_language_code || "en";
 
   // Combine all languages (primary + translator languages)
-  const allLanguages = [primaryLanguage, ...userLanguages.filter((lang: string) => lang !== primaryLanguage)]
+  const allLanguages = [
+    primaryLanguage,
+    ...userLanguages.filter((lang: string) => lang !== primaryLanguage),
+  ];
 
   // Fetch next question
   const fetchNextQuestion = async () => {
-    if (!user) return
+    if (!user) return;
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const excludeIds = seenPhraseIds.join(",")
+      const excludeIds = seenPhraseIds.join(",");
       const params = new URLSearchParams({
         stage: selectedStage,
         language_code: selectedLanguage,
         due_for_review: dueForReview.toString(),
         ...(excludeIds && { exclude_phrase_ids: excludeIds }),
-      })
+      });
 
-      const response = await fetch(`/quiz/practice/next?${params}`, {
+      const response = await apiFetch(`/quiz/practice/next?${params}`, {
         credentials: "include",
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch practice question")
+        throw new Error("Failed to fetch practice question");
       }
 
-      const data = await response.json()
+      const data = await response.json();
 
       // Check if session is complete (no more phrases)
       if (data.quiz_attempt_id === null) {
-        setSessionComplete(true)
-        setQuizData(null)
-        return
+        setSessionComplete(true);
+        setQuizData(null);
+        return;
       }
 
-      setQuizData(data)
-      setCurrentPosition(data.current_position)
-      setTotalCount(data.total_matching)
-      setQuizResult(null) // Reset result for new question
-      setSessionComplete(false)
+      setQuizData(data);
+      setCurrentPosition(data.current_position);
+      setTotalCount(data.total_matching);
+      setQuizResult(null); // Reset result for new question
+      setSessionComplete(false);
     } catch (error) {
-      console.error("Error fetching practice question:", error)
+      console.error("Error fetching practice question:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Handle answer submission
   const handleQuizSubmit = async (answer: string) => {
-    if (!quizData) return
+    if (!quizData) return;
 
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await fetch("/quiz/answer", {
+      const response = await apiFetch("/quiz/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -93,109 +101,109 @@ export default function Practice() {
           quiz_attempt_id: quizData.quiz_attempt_id,
           user_answer: answer,
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Failed to submit answer")
+        throw new Error("Failed to submit answer");
       }
 
-      const data = await response.json()
+      const data = await response.json();
       setQuizResult({
         was_correct: data.was_correct,
         correct_answer: data.correct_answer,
         user_answer: answer,
-      })
+      });
     } catch (error) {
-      console.error("Error submitting answer:", error)
+      console.error("Error submitting answer:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Handle skip
   const handleSkip = async () => {
-    if (!quizData) return
+    if (!quizData) return;
 
     try {
-      const response = await fetch("/quiz/skip", {
+      const response = await apiFetch("/quiz/skip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           phrase_id: quizData.phrase_id,
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Failed to skip question")
+        throw new Error("Failed to skip question");
       }
 
       // Add to seen phrases and fetch next
-      setSeenPhraseIds((prev) => [...prev, quizData.phrase_id])
-      setQuizResult(null)
-      fetchNextQuestion()
+      setSeenPhraseIds((prev) => [...prev, quizData.phrase_id]);
+      setQuizResult(null);
+      fetchNextQuestion();
     } catch (error) {
-      console.error("Error skipping question:", error)
+      console.error("Error skipping question:", error);
     }
-  }
+  };
 
   // Handle continue (after answering)
   const handleContinue = () => {
-    if (!quizData) return
+    if (!quizData) return;
 
     // Add to seen phrases and fetch next
-    setSeenPhraseIds((prev) => [...prev, quizData.phrase_id])
-    setQuizResult(null)
-    fetchNextQuestion()
-  }
+    setSeenPhraseIds((prev) => [...prev, quizData.phrase_id]);
+    setQuizResult(null);
+    fetchNextQuestion();
+  };
 
   // Handle stage filter change
   const handleStageChange = (stage: string) => {
-    const newParams = new URLSearchParams(searchParams)
-    newParams.set("stage", stage)
-    setSearchParams(newParams)
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("stage", stage);
+    setSearchParams(newParams);
 
     // Reset session
-    setSeenPhraseIds([])
-    setCurrentPosition(0)
-    setSessionComplete(false)
-  }
+    setSeenPhraseIds([]);
+    setCurrentPosition(0);
+    setSessionComplete(false);
+  };
 
   // Handle language filter change
   const handleLanguageChange = (language: string) => {
-    const newParams = new URLSearchParams(searchParams)
-    newParams.set("language", language)
-    setSearchParams(newParams)
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("language", language);
+    setSearchParams(newParams);
 
     // Reset session
-    setSeenPhraseIds([])
-    setCurrentPosition(0)
-    setSessionComplete(false)
-  }
+    setSeenPhraseIds([]);
+    setCurrentPosition(0);
+    setSessionComplete(false);
+  };
 
   // Handle due filter change
   const handleDueFilterChange = (due: boolean) => {
-    const newParams = new URLSearchParams(searchParams)
+    const newParams = new URLSearchParams(searchParams);
     if (due) {
-      newParams.set("due", "true")
+      newParams.set("due", "true");
     } else {
-      newParams.delete("due")
+      newParams.delete("due");
     }
-    setSearchParams(newParams)
+    setSearchParams(newParams);
 
     // Reset session
-    setSeenPhraseIds([])
-    setCurrentPosition(0)
-    setSessionComplete(false)
-  }
+    setSeenPhraseIds([]);
+    setCurrentPosition(0);
+    setSessionComplete(false);
+  };
 
   // Fetch first question when filters change
   useEffect(() => {
     if (user) {
-      fetchNextQuestion()
+      fetchNextQuestion();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStage, selectedLanguage, dueForReview, user])
+  }, [selectedStage, selectedLanguage, dueForReview, user]);
 
   return (
     <div className="w-full py-8">
@@ -307,7 +315,8 @@ export default function Practice() {
                   No phrases match your current filters.
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Try adjusting your selection or practice some more to unlock new phrases!
+                  Try adjusting your selection or practice some more to unlock
+                  new phrases!
                 </p>
               </div>
             )}
@@ -317,14 +326,15 @@ export default function Practice() {
               <div className="text-center py-16">
                 <h2 className="text-2xl font-bold mb-4">Great work!</h2>
                 <p className="text-lg text-muted-foreground mb-6">
-                  You've completed all {seenPhraseIds.length} phrases matching these filters.
+                  You've completed all {seenPhraseIds.length} phrases matching
+                  these filters.
                 </p>
                 <Button
                   onClick={() => {
-                    setSeenPhraseIds([])
-                    setCurrentPosition(0)
-                    setSessionComplete(false)
-                    fetchNextQuestion()
+                    setSeenPhraseIds([]);
+                    setCurrentPosition(0);
+                    setSessionComplete(false);
+                    fetchNextQuestion();
                   }}
                 >
                   Start Over
@@ -368,5 +378,5 @@ export default function Practice() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

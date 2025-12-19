@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { apiFetch } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -38,21 +39,22 @@ export default function Profile() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [quizFrequency, setQuizFrequency] = useState<number>(
-    user?.quiz_frequency ?? 5
+    user?.quiz_frequency ?? 5,
   );
   const [isUpdatingFrequency, setIsUpdatingFrequency] = useState(false);
 
   // Quiz type preferences state
   const [enableContextualQuiz, setEnableContextualQuiz] = useState<boolean>(
-    user?.enable_contextual_quiz ?? true
+    user?.enable_contextual_quiz ?? true,
   );
   const [enableDefinitionQuiz, setEnableDefinitionQuiz] = useState<boolean>(
-    user?.enable_definition_quiz ?? true
+    user?.enable_definition_quiz ?? true,
   );
   const [enableSynonymQuiz, setEnableSynonymQuiz] = useState<boolean>(
-    user?.enable_synonym_quiz ?? true
+    user?.enable_synonym_quiz ?? true,
   );
-  const [isUpdatingQuizPreferences, setIsUpdatingQuizPreferences] = useState(false);
+  const [isUpdatingQuizPreferences, setIsUpdatingQuizPreferences] =
+    useState(false);
 
   const handleQuizFrequencyChange = async (value: string) => {
     const newFrequency = parseInt(value);
@@ -60,7 +62,7 @@ export default function Profile() {
     setIsUpdatingFrequency(true);
 
     try {
-      const response = await fetch("/settings/quiz-frequency", {
+      const response = await apiFetch("/settings/quiz-frequency", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -79,7 +81,9 @@ export default function Profile() {
       }
     } catch (error) {
       console.error("Error updating quiz frequency:", error);
-      alert("An error occurred while updating quiz frequency. Please try again.");
+      alert(
+        "An error occurred while updating quiz frequency. Please try again.",
+      );
       // Revert to previous value if update failed
       setQuizFrequency(user?.quiz_frequency ?? 5);
     } finally {
@@ -91,13 +95,13 @@ export default function Profile() {
     preferenceKey: string,
     newValue: boolean,
     setterFunction: React.Dispatch<React.SetStateAction<boolean>>,
-    previousValue: boolean
+    previousValue: boolean,
   ) => {
     setterFunction(newValue);
     setIsUpdatingQuizPreferences(true);
 
     try {
-      const response = await fetch("/settings/quiz-preferences", {
+      const response = await apiFetch("/settings/quiz-preferences", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -116,7 +120,9 @@ export default function Profile() {
       }
     } catch (error) {
       console.error("Error updating quiz preference:", error);
-      alert("An error occurred while updating quiz preference. Please try again.");
+      alert(
+        "An error occurred while updating quiz preference. Please try again.",
+      );
       // Revert to previous value if update failed
       setterFunction(previousValue);
     } finally {
@@ -128,7 +134,7 @@ export default function Profile() {
     setIsDeleting(true);
 
     try {
-      const response = await fetch("/settings/account", {
+      const response = await apiFetch("/settings/account", {
         method: "DELETE",
         credentials: "include",
       });
@@ -210,19 +216,23 @@ export default function Profile() {
               {/* Quiz Type Preferences Section */}
               <div className="space-y-4">
                 <div className="text-left">
-                  <h3 className="text-sm font-semibold">Advanced Question Types</h3>
+                  <h3 className="text-sm font-semibold">
+                    Advanced Question Types
+                  </h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Choose which types of advanced questions to include in your practice.
-                    Basic and intermediate questions cannot be disabled.
+                    Choose which types of advanced questions to include in your
+                    practice. Basic and intermediate questions cannot be
+                    disabled.
                   </p>
                 </div>
 
                 {/* Info Note */}
                 <div className="rounded-lg bg-muted p-3 text-left">
                   <p className="text-sm text-muted-foreground">
-                    <strong>Note:</strong> If all advanced question types are disabled,
-                    the system will automatically enable them all to ensure you can still
-                    progress to the advanced learning stage.
+                    <strong>Note:</strong> If all advanced question types are
+                    disabled, the system will automatically enable them all to
+                    ensure you can still progress to the advanced learning
+                    stage.
                   </p>
                 </div>
 
@@ -244,7 +254,7 @@ export default function Profile() {
                         "enable_contextual_quiz",
                         checked,
                         setEnableContextualQuiz,
-                        enableContextualQuiz
+                        enableContextualQuiz,
                       )
                     }
                     disabled={isUpdatingQuizPreferences}
@@ -269,7 +279,7 @@ export default function Profile() {
                         "enable_definition_quiz",
                         checked,
                         setEnableDefinitionQuiz,
-                        enableDefinitionQuiz
+                        enableDefinitionQuiz,
                       )
                     }
                     disabled={isUpdatingQuizPreferences}
@@ -294,14 +304,12 @@ export default function Profile() {
                         "enable_synonym_quiz",
                         checked,
                         setEnableSynonymQuiz,
-                        enableSynonymQuiz
+                        enableSynonymQuiz,
                       )
                     }
                     disabled={isUpdatingQuizPreferences}
                   />
                 </div>
-
-
               </div>
             </CardContent>
           </Card>
@@ -313,7 +321,9 @@ export default function Profile() {
             <CardHeader>
               <CardTitle className="text-left">Languages</CardTitle>
               <CardDescription className="text-left">
-                Manage your primary language and learning languages. Reorder languages here to change the order of columns on the Translate page.
+                Manage your primary language and learning languages. Reorder
+                languages here to change the order of columns on the Translate
+                page.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -333,11 +343,15 @@ export default function Profile() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-foreground text-left">
-                You can delete your account with all your search history and learning progress.
+                You can delete your account with all your search history and
+                learning progress.
               </p>
 
               <div className="text-left">
-                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <Dialog
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button variant="destructive" size="sm">
                       Delete Account
@@ -355,8 +369,8 @@ export default function Profile() {
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle className="text-left">Warning</AlertTitle>
                       <AlertDescription className="text-left">
-                        Deleting your account will permanently remove all your data,
-                        including:
+                        Deleting your account will permanently remove all your
+                        data, including:
                         <ul className="list-disc list-inside mt-2 space-y-1 text-left">
                           <li>All search history</li>
                           <li>All practice progress</li>

@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { apiFetch } from "@/lib/api";
 import {
   Command,
   CommandEmpty,
@@ -25,7 +32,9 @@ export default function LanguageSetup() {
 
   const [nativeLanguage, setNativeLanguage] = useState<string>("");
   const [learningLanguages, setLearningLanguages] = useState<string[]>([]);
-  const [availableLanguages, setAvailableLanguages] = useState<typeof languages>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<
+    typeof languages
+  >([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,8 +46,8 @@ export default function LanguageSetup() {
   useEffect(() => {
     if (languages.length === 0) return;
 
-    const browserLang = navigator.language.split('-')[0];
-    const browserLanguage = languages.find(l => l.code === browserLang);
+    const browserLang = navigator.language.split("-")[0];
+    const browserLanguage = languages.find((l) => l.code === browserLang);
 
     if (browserLanguage && !nativeLanguage) {
       setNativeLanguage(browserLanguage.code);
@@ -52,11 +61,13 @@ export default function LanguageSetup() {
       return;
     }
 
-    const filtered = languages.filter(l => l.code !== nativeLanguage);
+    const filtered = languages.filter((l) => l.code !== nativeLanguage);
     setAvailableLanguages(filtered);
 
     // Remove native language from learning languages if it was selected
-    setLearningLanguages(prev => prev.filter(lang => lang !== nativeLanguage));
+    setLearningLanguages((prev) =>
+      prev.filter((lang) => lang !== nativeLanguage),
+    );
   }, [nativeLanguage, languages]);
 
   const addLearningLanguage = () => {
@@ -67,7 +78,7 @@ export default function LanguageSetup() {
 
     // Find first available language not already selected
     const nextLanguage = availableLanguages.find(
-      lang => !learningLanguages.includes(lang.code)
+      (lang) => !learningLanguages.includes(lang.code),
     );
 
     if (nextLanguage) {
@@ -77,7 +88,7 @@ export default function LanguageSetup() {
   };
 
   const removeLearningLanguage = (code: string) => {
-    setLearningLanguages(learningLanguages.filter(lang => lang !== code));
+    setLearningLanguages(learningLanguages.filter((lang) => lang !== code));
     setError(null);
   };
 
@@ -95,7 +106,9 @@ export default function LanguageSetup() {
     }
 
     // Filter out empty strings from learning languages
-    const validLearningLanguages = learningLanguages.filter(lang => lang !== '');
+    const validLearningLanguages = learningLanguages.filter(
+      (lang) => lang !== "",
+    );
 
     if (validLearningLanguages.length === 0) {
       setError("Please add at least one learning language");
@@ -106,7 +119,7 @@ export default function LanguageSetup() {
     setError(null);
 
     try {
-      const response = await fetch("/auth/update-languages", {
+      const response = await apiFetch("/auth/update-languages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -131,20 +144,30 @@ export default function LanguageSetup() {
     }
   };
 
-      // Auto-add initial learning languages based on browser language
+  // Auto-add initial learning languages based on browser language
   useEffect(() => {
-    if (learningLanguages.length === 0 && availableLanguages.length > 0 && nativeLanguage) {
+    if (
+      learningLanguages.length === 0 &&
+      availableLanguages.length > 0 &&
+      nativeLanguage
+    ) {
       // If native language is NOT English, first learning language is English
-      if (nativeLanguage !== 'en' && availableLanguages.some(l => l.code === 'en')) {
-        setLearningLanguages(['en', '']);
+      if (
+        nativeLanguage !== "en" &&
+        availableLanguages.some((l) => l.code === "en")
+      ) {
+        setLearningLanguages(["en", ""]);
       }
       // If native language IS English, first learning language is Spanish
-      else if (nativeLanguage === 'en' && availableLanguages.some(l => l.code === 'es')) {
-        setLearningLanguages(['es', '']);
+      else if (
+        nativeLanguage === "en" &&
+        availableLanguages.some((l) => l.code === "es")
+      ) {
+        setLearningLanguages(["es", ""]);
       }
       // Fallback: just add one empty slot
       else {
-        setLearningLanguages(['']);
+        setLearningLanguages([""]);
       }
     }
   }, [availableLanguages, learningLanguages.length, nativeLanguage]);
@@ -155,13 +178,17 @@ export default function LanguageSetup() {
         <CardHeader className="text-left">
           <CardTitle className="text-2xl">Choose languages</CardTitle>
           <CardDescription className="text-base py-2">
-            Please choose languages that you're using daily. The choice will be used for translations and quizzes to increase your active vocabulary.
+            Please choose languages that you're using daily. The choice will be
+            used for translations and quizzes to increase your active
+            vocabulary.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 text-left">
           {/* Native Language Selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Choose your native language</label>
+            <label className="text-sm font-medium">
+              Choose your native language
+            </label>
             <Popover open={nativeOpen} onOpenChange={setNativeOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -172,7 +199,8 @@ export default function LanguageSetup() {
                   disabled={languagesLoading}
                 >
                   {nativeLanguage
-                    ? languages.find((lang) => lang.code === nativeLanguage)?.en_name
+                    ? languages.find((lang) => lang.code === nativeLanguage)
+                        ?.en_name
                     : "Choose your native language"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -195,7 +223,9 @@ export default function LanguageSetup() {
                           <Check
                             className={cn(
                               "mr-2 h-4 w-4",
-                              nativeLanguage === lang.code ? "opacity-100" : "opacity-0"
+                              nativeLanguage === lang.code
+                                ? "opacity-100"
+                                : "opacity-0",
                             )}
                           />
                           {lang.en_name} ({lang.original_name})
@@ -210,11 +240,14 @@ export default function LanguageSetup() {
 
           {/* Learning Languages */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Choose languages that you're learning</label>
+            <label className="text-sm font-medium">
+              Choose languages that you're learning
+            </label>
             <div className="space-y-3">
               {learningLanguages.map((langCode, index) => {
                 const availableForThisSlot = availableLanguages.filter(
-                  l => l.code === langCode || !learningLanguages.includes(l.code)
+                  (l) =>
+                    l.code === langCode || !learningLanguages.includes(l.code),
                 );
 
                 const isOpen = learningOpen[index] || false;
@@ -235,8 +268,10 @@ export default function LanguageSetup() {
                           className="flex-1 justify-between"
                           disabled={languagesLoading}
                         >
-                          {langCode && langCode !== ''
-                            ? availableLanguages.find((lang) => lang.code === langCode)?.en_name
+                          {langCode && langCode !== ""
+                            ? availableLanguages.find(
+                                (lang) => lang.code === langCode,
+                              )?.en_name
                             : "Select a language"}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -259,7 +294,9 @@ export default function LanguageSetup() {
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      langCode === lang.code ? "opacity-100" : "opacity-0"
+                                      langCode === lang.code
+                                        ? "opacity-100"
+                                        : "opacity-0",
                                     )}
                                   />
                                   {lang.en_name} ({lang.original_name})
@@ -287,7 +324,10 @@ export default function LanguageSetup() {
                   variant="outline"
                   onClick={addLearningLanguage}
                   className="w-auto"
-                  disabled={languagesLoading || availableLanguages.length === learningLanguages.length}
+                  disabled={
+                    languagesLoading ||
+                    availableLanguages.length === learningLanguages.length
+                  }
                 >
                   Add language
                 </Button>
@@ -305,7 +345,9 @@ export default function LanguageSetup() {
           {/* Submit Button */}
           <Button
             onClick={handleSubmit}
-            disabled={saving || !nativeLanguage || learningLanguages.length === 0}
+            disabled={
+              saving || !nativeLanguage || learningLanguages.length === 0
+            }
             className="w-auto !mt-8"
           >
             {saving ? "Saving..." : "Set languages"}

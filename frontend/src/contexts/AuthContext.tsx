@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+import { apiFetch } from "@/lib/api";
 
 export interface User {
   id: number;
@@ -30,9 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check authentication status on mount
   const checkAuth = async () => {
     try {
-      const response = await fetch("/auth/me", {
-        credentials: "include",
-      });
+      const response = await apiFetch("/auth/me");
       const data = await response.json();
 
       if (data.success && data.authenticated) {
@@ -58,9 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      const response = await fetch("/auth/logout", {
+      const response = await apiFetch("/auth/logout", {
         method: "POST",
-        credentials: "include",
       });
 
       if (response.ok) {

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguageContext } from "@/contexts/LanguageContext";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -33,7 +34,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, ChevronsUpDown, GripVertical, X, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  GripVertical,
+  X,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Language } from "@/types/language";
 
@@ -68,7 +76,7 @@ function SortableLanguageItem({
       style={style}
       className={cn(
         "flex items-center gap-3 p-3 rounded-md border bg-card",
-        "hover:bg-accent transition-colors"
+        "hover:bg-accent transition-colors",
       )}
     >
       <div
@@ -104,11 +112,11 @@ export default function LanguageManager() {
   const { languages, loading: languagesLoading } = useLanguageContext();
 
   // Local state for optimistic updates - ensure safe initialization
-  const [primaryLanguage, setPrimaryLanguage] = useState<string>(() =>
-    user?.primary_language_code || ""
+  const [primaryLanguage, setPrimaryLanguage] = useState<string>(
+    () => user?.primary_language_code || "",
   );
   const [learningLanguages, setLearningLanguages] = useState<string[]>(() =>
-    Array.isArray(user?.translator_languages) ? user.translator_languages : []
+    Array.isArray(user?.translator_languages) ? user.translator_languages : [],
   );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +131,7 @@ export default function LanguageManager() {
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   // Detect changes
@@ -185,7 +193,7 @@ export default function LanguageManager() {
     setError(null);
 
     try {
-      const response = await fetch("/auth/update-languages", {
+      const response = await apiFetch("/auth/update-languages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -209,7 +217,7 @@ export default function LanguageManager() {
       setPrimaryLanguage(user?.primary_language_code || "");
       setLearningLanguages(user?.translator_languages || []);
       setError(
-        err instanceof Error ? err.message : "Network error. Please try again."
+        err instanceof Error ? err.message : "Network error. Please try again.",
       );
     } finally {
       setIsSaving(false);
@@ -219,15 +227,13 @@ export default function LanguageManager() {
   // Filter available languages for adding
   const availableToAdd = languages.filter(
     (lang) =>
-      lang.code !== primaryLanguage && !learningLanguages.includes(lang.code)
+      lang.code !== primaryLanguage && !learningLanguages.includes(lang.code),
   );
 
   // Show loading state while languages are being fetched
   if (languagesLoading) {
     return (
-      <p className="text-muted-foreground text-left">
-        Loading languages...
-      </p>
+      <p className="text-muted-foreground text-left">Loading languages...</p>
     );
   }
 
@@ -244,7 +250,9 @@ export default function LanguageManager() {
     <div className="space-y-6 text-left">
       {/* Primary Language Section */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Native Language (used for all explanations and information)</label>
+        <label className="text-sm font-medium">
+          Native Language (used for all explanations and information)
+        </label>
         <Popover open={primaryOpen} onOpenChange={setPrimaryOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -256,7 +264,9 @@ export default function LanguageManager() {
             >
               {primaryLanguage
                 ? (() => {
-                    const lang = languages.find((l) => l.code === primaryLanguage);
+                    const lang = languages.find(
+                      (l) => l.code === primaryLanguage,
+                    );
                     return lang
                       ? `${lang.en_name} (${lang.original_name})`
                       : "Select primary language";
@@ -285,7 +295,7 @@ export default function LanguageManager() {
                           "mr-2 h-4 w-4",
                           primaryLanguage === lang.code
                             ? "opacity-100"
-                            : "opacity-0"
+                            : "opacity-0",
                         )}
                       />
                       {lang.en_name} ({lang.original_name})
@@ -301,7 +311,10 @@ export default function LanguageManager() {
       {/* Learning Languages Section */}
       <div className="space-y-2">
         <label className="text-sm font-medium">
-          Learning Languages <span className="text-muted-foreground font-normal">(Drag to reorder)</span>
+          Learning Languages{" "}
+          <span className="text-muted-foreground font-normal">
+            (Drag to reorder)
+          </span>
         </label>
 
         {/* Learning languages list with drag-and-drop */}
@@ -345,7 +358,9 @@ export default function LanguageManager() {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              disabled={learningLanguages.length >= 5 || availableToAdd.length === 0}
+              disabled={
+                learningLanguages.length >= 5 || availableToAdd.length === 0
+              }
               className="w-auto"
             >
               + Add Language

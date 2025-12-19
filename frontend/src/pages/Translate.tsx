@@ -1,13 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import EtherealTorusFlow from "@/components/EtherealTorusFlow";
 import { QuizDialog } from "@/components/QuizDialog";
 import { LanguageInput } from "@/components/LanguageInput";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 
 interface TranslationResult {
   [language: string]: [string, string, string][];
@@ -36,7 +43,11 @@ interface LanguageField {
 }
 
 export default function Translate() {
-  const { languages, loading: languagesLoading, error: languagesError } = useLanguageContext();
+  const {
+    languages,
+    loading: languagesLoading,
+    error: languagesError,
+  } = useLanguageContext();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -60,18 +71,20 @@ export default function Translate() {
 
   // Get browser/OS language
   const getBrowserLanguage = (): string => {
-    const browserLang = navigator.language.split('-')[0];
+    const browserLang = navigator.language.split("-")[0];
     return browserLang;
   };
 
   // Get native language based on auth state
   const getNativeLanguage = (): string => {
     if (user && user.primary_language_code) {
-      const userLang = languages.find(l => l.code === user.primary_language_code);
+      const userLang = languages.find(
+        (l) => l.code === user.primary_language_code,
+      );
       return userLang ? userLang.en_name : "English";
     } else {
       const browserLangCode = getBrowserLanguage();
-      const browserLang = languages.find(l => l.code === browserLangCode);
+      const browserLang = languages.find((l) => l.code === browserLangCode);
       return browserLang ? browserLang.en_name : "English";
     }
   };
@@ -90,7 +103,7 @@ export default function Translate() {
       // Build fields: primary + all translator languages
       const allLangCodes = [
         user.primary_language_code,
-        ...user.translator_languages
+        ...user.translator_languages,
       ];
 
       const initialFields = allLangCodes.map((code, index) => ({
@@ -98,25 +111,41 @@ export default function Translate() {
         languageCode: code,
         text: "",
         translations: null,
-        spellingSuggestion: null
+        spellingSuggestion: null,
       }));
 
       setFields(initialFields);
     } else {
       // Guest users: default to 3 languages
       const browserLangCode = getBrowserLanguage();
-      const popularLanguages = ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko"];
+      const popularLanguages = [
+        "en",
+        "es",
+        "fr",
+        "de",
+        "it",
+        "pt",
+        "ru",
+        "zh",
+        "ja",
+        "ko",
+      ];
       const otherLangs = popularLanguages.filter(
-        lang => lang !== browserLangCode && languages.some(l => l.code === lang)
+        (lang) =>
+          lang !== browserLangCode && languages.some((l) => l.code === lang),
       );
 
-      const guestLangs = [browserLangCode, otherLangs[0] || "es", otherLangs[1] || "de"];
+      const guestLangs = [
+        browserLangCode,
+        otherLangs[0] || "es",
+        otherLangs[1] || "de",
+      ];
       const guestFields = guestLangs.map((code, index) => ({
         id: `field-${index}`,
         languageCode: code,
         text: "",
         translations: null,
-        spellingSuggestion: null
+        spellingSuggestion: null,
       }));
 
       setFields(guestFields);
@@ -127,13 +156,13 @@ export default function Translate() {
   const translateText = async (
     text: string,
     sourceLang: string,
-    targetLangs: string[]
+    targetLangs: string[],
   ) => {
     try {
       setTranslating(true);
       setTranslationError(null);
 
-      const response = await fetch("/translation/translate", {
+      const response = await apiFetch("/translation/translate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -150,11 +179,11 @@ export default function Translate() {
       const data = await response.json();
 
       // Debug: Log quiz trigger information
-      console.log('Translation response:', {
+      console.log("Translation response:", {
         should_show_quiz: data.should_show_quiz,
         quiz_phrase_id: data.quiz_phrase_id,
         searches_until_next_quiz: data.searches_until_next_quiz,
-        spelling_issue: data.spelling_issue
+        spelling_issue: data.spelling_issue,
       });
 
       if (data.success) {
@@ -163,7 +192,7 @@ export default function Translate() {
           return {
             spellingIssue: true,
             sentWord: data.sent_word,
-            correctWord: data.correct_word
+            correctWord: data.correct_word,
           };
         }
 
@@ -172,7 +201,7 @@ export default function Translate() {
           translations: data.translations,
           source_info: data.source_info,
           shouldShowQuiz: data.should_show_quiz,
-          quizPhraseId: data.quiz_phrase_id
+          quizPhraseId: data.quiz_phrase_id,
         };
       } else {
         setTranslationError(data.error || "Translation failed");
@@ -180,7 +209,7 @@ export default function Translate() {
       }
     } catch (error) {
       setTranslationError(
-        error instanceof Error ? error.message : "Network error"
+        error instanceof Error ? error.message : "Network error",
       );
       return null;
     } finally {
@@ -189,73 +218,90 @@ export default function Translate() {
   };
 
   // Handle spelling suggestion click
-  const handleSpellingSuggestionClick = (fieldId: string, correctWord: string) => {
+  const handleSpellingSuggestionClick = (
+    fieldId: string,
+    correctWord: string,
+  ) => {
     // Clear all spelling suggestions and update text
-    setFields(prev => prev.map(f =>
-      f.id === fieldId
-        ? { ...f, text: correctWord, spellingSuggestion: null }
-        : { ...f, spellingSuggestion: null }
-    ));
+    setFields((prev) =>
+      prev.map((f) =>
+        f.id === fieldId
+          ? { ...f, text: correctWord, spellingSuggestion: null }
+          : { ...f, spellingSuggestion: null },
+      ),
+    );
 
     setSourceFieldId(fieldId);
 
     // Trigger translation with the correct word
-    const sourceField = fields.find(f => f.id === fieldId);
+    const sourceField = fields.find((f) => f.id === fieldId);
     if (!sourceField) return;
 
     const targetLangs = fields
-      .filter(f => f.id !== fieldId)
-      .map(f => f.languageCode);
+      .filter((f) => f.id !== fieldId)
+      .map((f) => f.languageCode);
 
-    translateText(correctWord, sourceField.languageCode, targetLangs).then(result => {
-      if (result && !result.spellingIssue) {
-        const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
+    translateText(correctWord, sourceField.languageCode, targetLangs).then(
+      (result) => {
+        if (result && !result.spellingIssue) {
+          const { translations, source_info, shouldShowQuiz, quizPhraseId } =
+            result;
 
-        const otherFields = fields.filter(f => f.id !== fieldId);
-        const targetLangNames = targetLangs.map(getLanguageName);
+          const otherFields = fields.filter((f) => f.id !== fieldId);
+          const targetLangNames = targetLangs.map(getLanguageName);
 
-        const translatedTexts = targetLangNames.map((langName) => {
-          const translation = translations[langName];
-          if (!translation || !Array.isArray(translation) || translation.length === 0) return "";
-          return translation[0][0];
-        });
+          const translatedTexts = targetLangNames.map((langName) => {
+            const translation = translations[langName];
+            if (
+              !translation ||
+              !Array.isArray(translation) ||
+              translation.length === 0
+            )
+              return "";
+            return translation[0][0];
+          });
 
-        const structuredTranslations = targetLangNames.map((langName) => {
-          return translations[langName] || [];
-        });
+          const structuredTranslations = targetLangNames.map((langName) => {
+            return translations[langName] || [];
+          });
 
-        const sourceInfoArray = source_info ? [source_info] : null;
+          const sourceInfoArray = source_info ? [source_info] : null;
 
-        setFields(prev => prev.map(f => {
-          if (f.id === fieldId) {
-            return { ...f, translations: sourceInfoArray };
-          } else {
-            const index = otherFields.findIndex(of => of.id === f.id);
-            return {
-              ...f,
-              text: translatedTexts[index] || "",
-              translations: structuredTranslations[index] || null
-            };
+          setFields((prev) =>
+            prev.map((f) => {
+              if (f.id === fieldId) {
+                return { ...f, translations: sourceInfoArray };
+              } else {
+                const index = otherFields.findIndex((of) => of.id === f.id);
+                return {
+                  ...f,
+                  text: translatedTexts[index] || "",
+                  translations: structuredTranslations[index] || null,
+                };
+              }
+            }),
+          );
+
+          if (user && shouldShowQuiz && quizPhraseId) {
+            setTimeout(() => {
+              fetchAndShowQuiz(quizPhraseId);
+            }, 2500);
           }
-        }));
-
-        if (user && shouldShowQuiz && quizPhraseId) {
-          setTimeout(() => {
-            fetchAndShowQuiz(quizPhraseId);
-          }, 2500);
         }
-      }
-    });
+      },
+    );
   };
 
   // Handle text change with debouncing
   const handleTextChange = (fieldId: string, value: string) => {
     // Update the specific field and clear all spelling suggestions
-    setFields(prev => prev.map(f =>
-      f.id === fieldId
-        ? { ...f, text: value, translations: null, spellingSuggestion: null }
-        : { ...f, spellingSuggestion: null }
-    ));
+    setFields((prev) =>
+      prev.map((f) =>
+        f.id === fieldId
+          ? { ...f, text: value, translations: null, spellingSuggestion: null }
+          : { ...f, spellingSuggestion: null },
+      ),
+    );
 
     setSourceFieldId(fieldId);
 
@@ -265,41 +311,53 @@ export default function Translate() {
 
     if (!value.trim()) {
       // Clear all other fields
-      setFields(prev => prev.map(f => ({ ...f, text: "" })));
+      setFields((prev) => prev.map((f) => ({ ...f, text: "" })));
       return;
     }
 
     debounceTimerRef.current = setTimeout(async () => {
-      const sourceField = fields.find(f => f.id === fieldId);
+      const sourceField = fields.find((f) => f.id === fieldId);
       if (!sourceField) return;
 
       // Get all other languages as targets
       const targetLangs = fields
-        .filter(f => f.id !== fieldId)
-        .map(f => f.languageCode);
+        .filter((f) => f.id !== fieldId)
+        .map((f) => f.languageCode);
 
-      const result = await translateText(value, sourceField.languageCode, targetLangs);
+      const result = await translateText(
+        value,
+        sourceField.languageCode,
+        targetLangs,
+      );
 
       if (result) {
         // Handle spelling issue
         if (result.spellingIssue) {
-          setFields(prev => prev.map(f =>
-            f.id === fieldId
-              ? { ...f, spellingSuggestion: result.correctWord }
-              : { ...f, spellingSuggestion: null }
-          ));
+          setFields((prev) =>
+            prev.map((f) =>
+              f.id === fieldId
+                ? { ...f, spellingSuggestion: result.correctWord }
+                : { ...f, spellingSuggestion: null },
+            ),
+          );
           return;
         }
 
-        const { translations, source_info, shouldShowQuiz, quizPhraseId } = result;
+        const { translations, source_info, shouldShowQuiz, quizPhraseId } =
+          result;
 
         // Distribute translations to all fields
-        const otherFields = fields.filter(f => f.id !== fieldId);
+        const otherFields = fields.filter((f) => f.id !== fieldId);
         const targetLangNames = targetLangs.map(getLanguageName);
 
         const translatedTexts = targetLangNames.map((langName) => {
           const translation = translations[langName];
-          if (!translation || !Array.isArray(translation) || translation.length === 0) return "";
+          if (
+            !translation ||
+            !Array.isArray(translation) ||
+            translation.length === 0
+          )
+            return "";
           return translation[0][0];
         });
 
@@ -309,18 +367,20 @@ export default function Translate() {
 
         const sourceInfoArray = source_info ? [source_info] : null;
 
-        setFields(prev => prev.map(f => {
-          if (f.id === fieldId) {
-            return { ...f, translations: sourceInfoArray };
-          } else {
-            const index = otherFields.findIndex(of => of.id === f.id);
-            return {
-              ...f,
-              text: translatedTexts[index] || "",
-              translations: structuredTranslations[index] || null
-            };
-          }
-        }));
+        setFields((prev) =>
+          prev.map((f) => {
+            if (f.id === fieldId) {
+              return { ...f, translations: sourceInfoArray };
+            } else {
+              const index = otherFields.findIndex((of) => of.id === f.id);
+              return {
+                ...f,
+                text: translatedTexts[index] || "",
+                translations: structuredTranslations[index] || null,
+              };
+            }
+          }),
+        );
 
         // Trigger quiz after delay if needed (only for logged-in users)
         if (user && shouldShowQuiz && quizPhraseId) {
@@ -335,19 +395,21 @@ export default function Translate() {
   // Clear field function
   const clearField = () => {
     // Clear ALL fields (maintains current behavior)
-    setFields(prev => prev.map(f => ({
-      ...f,
-      text: "",
-      translations: null,
-      spellingSuggestion: null
-    })));
+    setFields((prev) =>
+      prev.map((f) => ({
+        ...f,
+        text: "",
+        translations: null,
+        spellingSuggestion: null,
+      })),
+    );
     setSourceFieldId(null);
     setTranslationError(null);
   };
 
   // Copy field function
   const copyField = async (fieldId: string) => {
-    const field = fields.find(f => f.id === fieldId);
+    const field = fields.find((f) => f.id === fieldId);
     if (!field?.text) return;
 
     try {
@@ -364,33 +426,39 @@ export default function Translate() {
 
   // Handle language change (guest users only)
   const handleLanguageChange = (fieldId: string, newLanguageCode: string) => {
-    setFields(prev => prev.map(f =>
-      f.id === fieldId
-        ? { ...f, languageCode: newLanguageCode }
-        : f
-    ));
+    setFields((prev) =>
+      prev.map((f) =>
+        f.id === fieldId ? { ...f, languageCode: newLanguageCode } : f,
+      ),
+    );
   };
 
   // Fetch and show quiz from backend
   const fetchAndShowQuiz = async (phraseId: number) => {
     try {
-      console.log('Fetching quiz from:', `/quiz/next?phrase_id=${phraseId}`);
-      const response = await fetch(`/quiz/next?phrase_id=${phraseId}`);
+      console.log("Fetching quiz from:", `/quiz/next?phrase_id=${phraseId}`);
+      const response = await apiFetch(`/quiz/next?phrase_id=${phraseId}`);
 
-      console.log('Quiz response status:', response.status);
-      console.log('Quiz response headers:', response.headers.get('content-type'));
+      console.log("Quiz response status:", response.status);
+      console.log(
+        "Quiz response headers:",
+        response.headers.get("content-type"),
+      );
 
       // Log raw response text first to see what we're getting
       const responseText = await response.text();
-      console.log('Quiz response body (first 200 chars):', responseText.substring(0, 200));
+      console.log(
+        "Quiz response body (first 200 chars):",
+        responseText.substring(0, 200),
+      );
 
       // Try to parse as JSON
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError);
-        console.error('Response was:', responseText.substring(0, 500));
+        console.error("Failed to parse response as JSON:", parseError);
+        console.error("Response was:", responseText.substring(0, 500));
         return;
       }
 
@@ -400,7 +468,7 @@ export default function Translate() {
           question: data.question,
           options: data.options,
           question_type: data.question_type,
-          phrase_id: data.phrase_id
+          phrase_id: data.phrase_id,
         };
 
         setQuizData(quizData);
@@ -408,10 +476,10 @@ export default function Translate() {
         setQuizResult(null);
       } else {
         // Silently skip if no quiz available (404 error)
-        console.log('No quiz available:', data.error);
+        console.log("No quiz available:", data.error);
       }
     } catch (error) {
-      console.error('Failed to fetch quiz:', error);
+      console.error("Failed to fetch quiz:", error);
     }
   };
 
@@ -420,13 +488,13 @@ export default function Translate() {
     if (!quizData) return;
 
     try {
-      const response = await fetch('/quiz/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await apiFetch("/quiz/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           quiz_attempt_id: quizData.quiz_attempt_id,
-          user_answer: answer
-        })
+          user_answer: answer,
+        }),
       });
 
       const data = await response.json();
@@ -435,15 +503,15 @@ export default function Translate() {
         const result: QuizResult = {
           was_correct: data.was_correct,
           correct_answer: data.correct_answer,
-          user_answer: answer
+          user_answer: answer,
         };
 
         setQuizResult(result);
       } else {
-        console.error('Failed to submit quiz answer:', data.error);
+        console.error("Failed to submit quiz answer:", data.error);
       }
     } catch (error) {
-      console.error('Failed to submit quiz answer:', error);
+      console.error("Failed to submit quiz answer:", error);
     }
   };
 
@@ -451,15 +519,15 @@ export default function Translate() {
     if (!quizData) return;
 
     try {
-      await fetch('/quiz/skip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await apiFetch("/quiz/skip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phrase_id: quizData.phrase_id
-        })
+          phrase_id: quizData.phrase_id,
+        }),
       });
     } catch (error) {
-      console.error('Failed to skip quiz:', error);
+      console.error("Failed to skip quiz:", error);
     } finally {
       // Always close the dialog
       setShowQuiz(false);
@@ -475,21 +543,27 @@ export default function Translate() {
 
     // Fetch next quiz (without phrase_id to get any eligible phrase)
     try {
-      console.log('Fetching next quiz...');
-      const response = await fetch('/quiz/next');
+      console.log("Fetching next quiz...");
+      const response = await apiFetch("/quiz/next");
 
-      console.log('Next quiz response status:', response.status);
+      console.log("Next quiz response status:", response.status);
 
       // Log raw response text first to see what we're getting
       const responseText = await response.text();
-      console.log('Next quiz response (first 200 chars):', responseText.substring(0, 200));
+      console.log(
+        "Next quiz response (first 200 chars):",
+        responseText.substring(0, 200),
+      );
 
       // Try to parse as JSON
       let data;
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error('Failed to parse next quiz response as JSON:', parseError);
+        console.error(
+          "Failed to parse next quiz response as JSON:",
+          parseError,
+        );
         // No more quizzes available, close dialog
         setShowQuiz(false);
         setQuizData(null);
@@ -502,19 +576,19 @@ export default function Translate() {
           question: data.question,
           options: data.options,
           question_type: data.question_type,
-          phrase_id: data.phrase_id
+          phrase_id: data.phrase_id,
         };
 
         setQuizData(newQuizData);
         // Keep showQuiz true so dialog stays open
       } else {
         // No more quizzes available, close dialog
-        console.log('No more quizzes available:', data.error);
+        console.log("No more quizzes available:", data.error);
         setShowQuiz(false);
         setQuizData(null);
       }
     } catch (error) {
-      console.error('Failed to fetch next quiz:', error);
+      console.error("Failed to fetch next quiz:", error);
       // Close dialog on error
       setShowQuiz(false);
       setQuizData(null);
@@ -527,7 +601,10 @@ export default function Translate() {
     <div>
       {/* EtherealTorusFlow Animation Background - Only for logged-out users */}
       {!user && (
-        <div className="absolute left-0 w-full flex justify-center pointer-events-none z-0" style={{ top: '-96px' }}>
+        <div
+          className="absolute left-0 w-full flex justify-center pointer-events-none z-0"
+          style={{ top: "-96px" }}
+        >
           <EtherealTorusFlow />
         </div>
       )}
@@ -542,8 +619,11 @@ export default function Translate() {
             <h2 className="w-full text-5xl md:text-6xl lg:text-7xl font-normal font-baskerville leading-tight text-center px-8 pt-3">
               Remember forever.
             </h2>
-            <p className="w-full text-lg md:text-xl lg:text-2xl py-10 px-8 text-center">Translator for those who use more than two languages daily<br />
-            with AI-powered quizzes increasing active vocabulary.</p>
+            <p className="w-full text-lg md:text-xl lg:text-2xl py-10 px-8 text-center">
+              Translator for those who use more than two languages daily
+              <br />
+              with AI-powered quizzes increasing active vocabulary.
+            </p>
             <Button
               onClick={() => navigate("/login")}
               className="h-9 px-4 py-2 shadow-sm"
@@ -556,26 +636,39 @@ export default function Translate() {
 
       {/* Main Content */}
       <main className="w-full pt-12 relative z-10">
-        <div className={cn(
-          "grid gap-6 md:gap-8",
-          fields.length === 2 ? "grid-cols-1 md:grid-cols-2" :
-          "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-        )}>
+        <div
+          className={cn(
+            "grid gap-6 md:gap-8",
+            fields.length === 2
+              ? "grid-cols-1 md:grid-cols-2"
+              : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+          )}
+        >
           {fields.map((field) => (
             <div key={field.id} className="flex flex-col gap-2">
               {/* Language selector for non-authenticated users */}
               {!user && (
                 <Select
                   value={field.languageCode}
-                  onValueChange={(value) => handleLanguageChange(field.id, value)}
+                  onValueChange={(value) =>
+                    handleLanguageChange(field.id, value)
+                  }
                   disabled={languagesLoading}
                 >
                   <SelectTrigger className="h-9 bg-background">
-                    <SelectValue placeholder={languagesLoading ? "Loading languages..." : "Select language"} />
+                    <SelectValue
+                      placeholder={
+                        languagesLoading
+                          ? "Loading languages..."
+                          : "Select language"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {languagesError ? (
-                      <SelectItem value="error" disabled>Error loading languages</SelectItem>
+                      <SelectItem value="error" disabled>
+                        Error loading languages
+                      </SelectItem>
                     ) : (
                       languages.map((lang) => (
                         <SelectItem key={lang.code} value={lang.code}>
@@ -623,21 +716,38 @@ export default function Translate() {
       {/* How it works section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
-          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">How it works</h2>
+          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">
+            How it works
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex flex-col items-center text-left gap-4">
-              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">1</div>
-              <p className="text-lg">Set your native language and foreign languages that you learn and use.</p>
+              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">
+                1
+              </div>
+              <p className="text-lg">
+                Set your native language and foreign languages that you learn
+                and use.
+              </p>
             </div>
 
             <div className="flex flex-col items-center text-left gap-4">
-              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">2</div>
-              <p className="text-lg">Enter a word in any language and receive a translation to your other languages.</p>
+              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">
+                2
+              </div>
+              <p className="text-lg">
+                Enter a word in any language and receive a translation to your
+                other languages.
+              </p>
             </div>
 
             <div className="flex flex-col items-center text-left gap-4">
-              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">3</div>
-              <p className="text-lg">Solve quizzes about the words that you have translated in order to remember them.</p>
+              <div className="text-3xl font-bold font-baskerville leading-relaxed text-left">
+                3
+              </div>
+              <p className="text-lg">
+                Solve quizzes about the words that you have translated in order
+                to remember them.
+              </p>
             </div>
           </div>
         </section>
@@ -646,16 +756,23 @@ export default function Translate() {
       {/* Quiz Cards section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
-          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">Try sample quizzes</h2>
+          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">
+            Try sample quizzes
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
             {/* Beginner Quiz Card */}
             <div className="flex flex-col text-left gap-4 p-6 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">Beginner</span>
-                <span className="text-sm text-muted-foreground">Multiple Choice</span>
+                <span className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">
+                  Beginner
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  Multiple Choice
+                </span>
               </div>
-              <h3 className="text-xl font-semibold mt-2">What does "Katze" mean in English?</h3>
+              <h3 className="text-xl font-semibold mt-2">
+                What does "Katze" mean in English?
+              </h3>
               <div className="flex flex-col gap-2 mt-2">
                 <div className="p-3 rounded-md border border-border hover:bg-muted/50 cursor-pointer transition-colors">
                   A) Dog
@@ -678,13 +795,21 @@ export default function Translate() {
             {/* Intermediate Quiz Card */}
             <div className="flex flex-col text-left gap-4 p-6 rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">Intermediate</span>
-                <span className="text-sm text-muted-foreground">Fill in the Blank</span>
+                <span className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-800 rounded-full">
+                  Intermediate
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  Fill in the Blank
+                </span>
               </div>
-              <h3 className="text-xl font-semibold mt-2">Complete the sentence:</h3>
+              <h3 className="text-xl font-semibold mt-2">
+                Complete the sentence:
+              </h3>
               <div className="flex flex-col gap-3 mt-2">
                 <p className="text-lg">Ich _____ gerne Bücher.</p>
-                <p className="text-sm text-muted-foreground italic">(I like to read books)</p>
+                <p className="text-sm text-muted-foreground italic">
+                  (I like to read books)
+                </p>
                 <div className="p-3 rounded-md border border-border bg-muted/30">
                   <input
                     type="text"
@@ -698,7 +823,6 @@ export default function Translate() {
                 Practice active recall with context-based questions
               </p>
             </div>
-
           </div>
         </section>
       )}
@@ -706,16 +830,38 @@ export default function Translate() {
       {/* Problems it solves section - Only for logged-out users */}
       {!user && (
         <section className="w-full py-16 mt-16">
-          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">Problems it solves</h2>
+          <h2 className="text-4xl font-bold font-baskerville leading-snug text-left mb-12">
+            Problems it solves
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="flex flex-col text-left gap-4">
-              <h3 className="text-2xl font-semibold">Multi-directional Translation: <br />Stop switching translation directions.</h3>
-              <p className="text-lg">You speak one language at home, another on the street, and English at work. But your translator only shows two languages at a time. With Minin, type a word in any of your languages and instantly see translations in all the others. No more switching directions. No more juggling tabs. Just search once and see all languages that you use daily side by side.</p>
+              <h3 className="text-2xl font-semibold">
+                Multi-directional Translation: <br />
+                Stop switching translation directions.
+              </h3>
+              <p className="text-lg">
+                You speak one language at home, another on the street, and
+                English at work. But your translator only shows two languages at
+                a time. With Minin, type a word in any of your languages and
+                instantly see translations in all the others. No more switching
+                directions. No more juggling tabs. Just search once and see all
+                languages that you use daily side by side.
+              </p>
             </div>
 
             <div className="flex flex-col text-left gap-4">
-              <h3 className="text-2xl font-semibold">Bookmarks don't teach you. Quizzes do: <br />Stop looking up the same words.</h3>
-              <p className="text-lg">You look up this word for the third time this month. You even saved it, but favorites lists don't help you remember — they just pile up. Minin is different. After every few searches, you get a quick and smart quiz on words you've looked up. The app tracks what you have learned, and what you keep forgetting and turns translations into lasting & active vocabulary.</p>
+              <h3 className="text-2xl font-semibold">
+                Bookmarks don't teach you. Quizzes do: <br />
+                Stop looking up the same words.
+              </h3>
+              <p className="text-lg">
+                You look up this word for the third time this month. You even
+                saved it, but favorites lists don't help you remember — they
+                just pile up. Minin is different. After every few searches, you
+                get a quick and smart quiz on words you've looked up. The app
+                tracks what you have learned, and what you keep forgetting and
+                turns translations into lasting & active vocabulary.
+              </p>
             </div>
           </div>
         </section>
@@ -724,8 +870,16 @@ export default function Translate() {
       {/* Large minin branding - For logged-out users */}
       {!user && (
         <section className="w-full py-0">
-          <h2 className="w-full text-[120px] md:text-[160px] lg:text-[480px] font-bold text-center">minin</h2>
-          <p className="text-lg">Designed and Developed by<a href='http://linkedin.com/in/aleksandr.sudin'> Sasha — Hire me!</a></p>
+          <h2 className="w-full text-[120px] md:text-[160px] lg:text-[480px] font-bold text-center">
+            minin
+          </h2>
+          <p className="text-lg">
+            Designed and Developed by
+            <a href="http://linkedin.com/in/aleksandr.sudin">
+              {" "}
+              Sasha — Hire me!
+            </a>
+          </p>
         </section>
       )}
 

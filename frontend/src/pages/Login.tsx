@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
+import { apiFetch } from "@/lib/api";
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -15,9 +16,11 @@ export default function Login() {
   }, [user, navigate]);
 
   // Handle Google Sign-In success
-  const handleGoogleSignIn = async (response: google.accounts.id.CredentialResponse) => {
+  const handleGoogleSignIn = async (
+    response: google.accounts.id.CredentialResponse,
+  ) => {
     try {
-      const result = await fetch("/auth/google", {
+      const result = await apiFetch("/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -45,7 +48,6 @@ export default function Login() {
   return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-1 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
-
         {/* Logo/Branding <a href="/" className="flex items-center gap-2 self-center font-medium">
            <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md text-xl font-bold">
             m
@@ -60,7 +62,8 @@ export default function Login() {
               Welcome to Minin
             </h1>
             <p className="text-sm text-muted-foreground leading-5">
-              Multi-language translator that teaches you as you search with AI-powered quizzes to help you build active vocabulary.
+              Multi-language translator that teaches you as you search with
+              AI-powered quizzes to help you build active vocabulary.
             </p>
           </div>
 

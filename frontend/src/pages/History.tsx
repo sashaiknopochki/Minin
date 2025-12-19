@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguageContext } from "@/contexts/LanguageContext";
 import { useSearchParams } from "react-router-dom";
+import { apiFetch } from "@/lib/api";
 import {
   Table,
   TableBody,
@@ -74,7 +75,10 @@ export default function History() {
   const primaryLanguage = user?.primary_language_code || "en";
 
   // Combine all languages (primary + translator languages)
-  const allLanguages = [primaryLanguage, ...userLanguages.filter((lang: string) => lang !== primaryLanguage)];
+  const allLanguages = [
+    primaryLanguage,
+    ...userLanguages.filter((lang: string) => lang !== primaryLanguage),
+  ];
 
   // Fetch search history
   useEffect(() => {
@@ -92,7 +96,7 @@ export default function History() {
           url += `&stage=${selectedStage}`;
         }
 
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           method: "GET",
           credentials: "include",
         });
@@ -159,7 +163,7 @@ export default function History() {
     try {
       setDeletingIds(new Set(deletingIds).add(searchId));
 
-      const response = await fetch(`/api/history/${searchId}`, {
+      const response = await apiFetch(`/api/history/${searchId}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -183,8 +187,8 @@ export default function History() {
   // Format date as DD.MM.YYYY
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}.${month}.${year}`;
   };
@@ -195,7 +199,7 @@ export default function History() {
 
     // Extract just the word/phrase from each meaning [word, part_of_speech, definition]
     // Join multiple meanings with commas
-    return meanings.map(meaning => meaning[0]).join(", ");
+    return meanings.map((meaning) => meaning[0]).join(", ");
   };
 
   // Loading state
@@ -233,9 +237,7 @@ export default function History() {
       <div className="w-full py-8">
         <h1 className="text-4xl font-bold mb-8 text-left">History</h1>
         <div className="flex flex-col items-center justify-center py-16 px-4">
-          <p className="text-lg text-destructive text-center">
-            {error}
-          </p>
+          <p className="text-lg text-destructive text-center">{error}</p>
         </div>
       </div>
     );
@@ -253,7 +255,9 @@ export default function History() {
       <div className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-4">
         {/* Language Filter */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground mr-2">Filter by language:</span>
+          <span className="text-sm font-medium text-muted-foreground mr-2">
+            Filter by language:
+          </span>
           <ButtonGroup>
             <Button
               variant={selectedLanguage === "all" ? "default" : "outline"}
@@ -277,7 +281,9 @@ export default function History() {
 
         {/* Stage Filter */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground mr-2">Filter by stage:</span>
+          <span className="text-sm font-medium text-muted-foreground mr-2">
+            Filter by stage:
+          </span>
           <ButtonGroup>
             <Button
               variant={selectedStage === "all" ? "default" : "outline"}
@@ -327,7 +333,10 @@ export default function History() {
 
                 {/* Additional columns for desktop - hidden on mobile */}
                 {allLanguages.slice(3).map((langCode) => (
-                  <TableHead key={langCode} className="min-w-[150px] hidden md:table-cell">
+                  <TableHead
+                    key={langCode}
+                    className="min-w-[150px] hidden md:table-cell"
+                  >
                     {getLanguageName(langCode)}
                   </TableHead>
                 ))}
@@ -413,8 +422,9 @@ export default function History() {
         <div className="mt-6 space-y-4">
           {/* Result count display */}
           <div className="text-sm text-muted-foreground text-center">
-            Showing {((pagination.page - 1) * pagination.per_page) + 1}-
-            {Math.min(pagination.page * pagination.per_page, pagination.total)} of {pagination.total} results
+            Showing {(pagination.page - 1) * pagination.per_page + 1}-
+            {Math.min(pagination.page * pagination.per_page, pagination.total)}{" "}
+            of {pagination.total} results
           </div>
 
           {/* Pagination controls */}
@@ -425,7 +435,11 @@ export default function History() {
                 <PaginationItem>
                   <PaginationPrevious
                     onClick={() => handlePageChange(currentPage - 1)}
-                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    className={
+                      currentPage <= 1
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
                   />
                 </PaginationItem>
 
@@ -444,7 +458,7 @@ export default function History() {
                       >
                         1
                       </PaginationLink>
-                    </PaginationItem>
+                    </PaginationItem>,
                   );
 
                   // Show ellipsis if needed before current page range
@@ -452,7 +466,7 @@ export default function History() {
                     pages.push(
                       <PaginationItem key="ellipsis-start">
                         <PaginationEllipsis />
-                      </PaginationItem>
+                      </PaginationItem>,
                     );
                   }
 
@@ -470,7 +484,7 @@ export default function History() {
                         >
                           {i}
                         </PaginationLink>
-                      </PaginationItem>
+                      </PaginationItem>,
                     );
                   }
 
@@ -479,7 +493,7 @@ export default function History() {
                     pages.push(
                       <PaginationItem key="ellipsis-end">
                         <PaginationEllipsis />
-                      </PaginationItem>
+                      </PaginationItem>,
                     );
                   }
 
@@ -494,7 +508,7 @@ export default function History() {
                         >
                           {totalPages}
                         </PaginationLink>
-                      </PaginationItem>
+                      </PaginationItem>,
                     );
                   }
 
@@ -505,7 +519,11 @@ export default function History() {
                 <PaginationItem>
                   <PaginationNext
                     onClick={() => handlePageChange(currentPage + 1)}
-                    className={currentPage >= pagination.pages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    className={
+                      currentPage >= pagination.pages
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import type { Language, LanguagesResponse } from '@/types/language';
+import { useState, useEffect } from "react";
+import type { Language, LanguagesResponse } from "@/types/language";
+import { apiFetch } from "@/lib/api";
 
-const CACHE_KEY = 'minin_languages';
+const CACHE_KEY = "minin_languages";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 interface CachedData {
@@ -33,8 +34,8 @@ export function useLanguages() {
         }
 
         // Fetch from API if no cache or cache expired
-        // Uses relative URL - Vite proxy will forward to Flask backend
-        const response = await fetch('/api/languages');
+        // Uses apiFetch which handles both dev (Vite proxy) and production (VITE_API_URL)
+        const response = await apiFetch("/api/languages");
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -52,12 +53,14 @@ export function useLanguages() {
           };
           localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
         } else {
-          throw new Error('Invalid response format');
+          throw new Error("Invalid response format");
         }
 
         setLoading(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch languages');
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch languages",
+        );
         setLoading(false);
       }
     };
