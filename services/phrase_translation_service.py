@@ -10,12 +10,15 @@ This service implements the multi-target-language caching strategy:
 """
 
 import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import sqlalchemy.exc
 from models import db
 from models.phrase import Phrase
 from models.phrase_translation import PhraseTranslation
+
 from services.llm_translation_service import translate_text
 from services.session_cost_aggregator import add_translation_cost
 
@@ -26,9 +29,7 @@ MAX_QUIZZABLE_LENGTH = 48
 
 
 def get_or_create_phrase(
-    text: str,
-    language_code: str,
-    phrase_type: str = 'word'
+    text: str, language_code: str, phrase_type: str = "word"
 ) -> Optional[Phrase]:
     """
     Get existing phrase or create a new one.
@@ -47,12 +48,13 @@ def get_or_create_phrase(
 
         # Try to find existing phrase
         phrase = Phrase.query.filter_by(
-            text=normalized_text,
-            language_code=language_code
+            text=normalized_text, language_code=language_code
         ).first()
 
         if phrase:
-            logger.debug(f"Found existing phrase: {phrase.id} - '{text}' ({language_code})")
+            logger.debug(
+                f"Found existing phrase: {phrase.id} - '{text}' ({language_code})"
+            )
             return phrase
 
         # Create new phrase
@@ -63,14 +65,37 @@ def get_or_create_phrase(
             language_code=language_code,
             type=phrase_type,
             is_quizzable=is_quizzable,
-            search_count=0
+            search_count=0,
         )
 
         db.session.add(phrase)
-        db.session.flush()  # Get the ID without committing
 
-        logger.info(f"Created new phrase: {phrase.id} - '{text}' ({language_code}), quizzable={is_quizzable}")
-        return phrase
+        try:
+            db.session.flush()  # Get the ID without committing
+            logger.info(
+                f"Created new phrase: {phrase.id} - '{text}' ({language_code}), quizzable={is_quizzable}"
+            )
+            return phrase
+        except sqlalchemy.exc.IntegrityError:
+            # Race condition: Another request created the same phrase concurrently
+            # Rollback and query again to get the existing phrase
+            db.session.rollback()
+            logger.debug(
+                f"Race condition detected for phrase '{text}' ({language_code}), querying again"
+            )
+
+            phrase = Phrase.query.filter_by(
+                text=normalized_text, language_code=language_code
+            ).first()
+
+            if phrase:
+                logger.debug(f"Found phrase after race condition: {phrase.id}")
+                return phrase
+            else:
+                logger.error(
+                    f"Failed to find phrase after race condition for '{text}' ({language_code})"
+                )
+                return None
 
     except Exception as e:
         logger.error(f"Failed to get or create phrase: {str(e)}", exc_info=True)
@@ -79,8 +104,7 @@ def get_or_create_phrase(
 
 
 def get_cached_translation(
-    phrase_id: int,
-    target_language_code: str
+    phrase_id: int, target_language_code: str
 ) -> Optional[PhraseTranslation]:
     """
     Get cached translation for a phrase in a specific target language.
@@ -94,14 +118,17 @@ def get_cached_translation(
     """
     try:
         cached = PhraseTranslation.query.filter_by(
-            phrase_id=phrase_id,
-            target_language_code=target_language_code
+            phrase_id=phrase_id, target_language_code=target_language_code
         ).first()
 
         if cached:
-            logger.info(f"Cache HIT: phrase_id={phrase_id}, target={target_language_code}")
+            logger.info(
+                f"Cache HIT: phrase_id={phrase_id}, target={target_language_code}"
+            )
         else:
-            logger.info(f"Cache MISS: phrase_id={phrase_id}, target={target_language_code}")
+            logger.info(
+                f"Cache MISS: phrase_id={phrase_id}, target={target_language_code}"
+            )
 
         return cached
 
@@ -121,7 +148,7 @@ def cache_translation(
     completion_tokens: int = 0,
     total_tokens: int = 0,
     cached_tokens: int = 0,
-    cost_usd: Optional[Decimal] = None
+    cost_usd: Optional[Decimal] = None,
 ) -> Optional[PhraseTranslation]:
     """
     Cache a translation for future use with cost tracking.
@@ -145,8 +172,7 @@ def cache_translation(
     try:
         # Check if translation already exists (shouldn't happen, but be safe)
         existing = PhraseTranslation.query.filter_by(
-            phrase_id=phrase_id,
-            target_language_code=target_language_code
+            phrase_id=phrase_id, target_language_code=target_language_code
         ).first()
 
         if existing:
@@ -185,7 +211,9 @@ def cache_translation(
             total_tokens=total_tokens,
             cached_tokens=cached_tokens,
             estimated_cost_usd=float(cost_usd) if cost_usd is not None else 0.0,
-            cost_calculated_at=datetime.now(timezone.utc) if cost_usd is not None else None
+            cost_calculated_at=datetime.now(timezone.utc)
+            if cost_usd is not None
+            else None,
         )
 
         db.session.add(translation)
@@ -212,7 +240,7 @@ def get_or_create_translations(
     target_language_codes: List[str],
     model: str,
     native_language: str = "English",
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Get translations with intelligent caching and cost tracking.
@@ -251,10 +279,7 @@ def get_or_create_translations(
         # Step 1: Get or create the phrase
         phrase = get_or_create_phrase(text, source_language_code)
         if not phrase:
-            return {
-                "success": False,
-                "error": "Failed to create or retrieve phrase"
-            }
+            return {"success": False, "error": "Failed to create or retrieve phrase"}
 
         # Step 2: Check cache for each target language
         cached_translations = {}
@@ -293,15 +318,17 @@ def get_or_create_translations(
                 source_language=source_language,
                 target_languages=uncached_languages,
                 model=model,
-                native_language=native_language
+                native_language=native_language,
             )
 
             # Check if spelling issue was detected - return early without caching
-            if llm_result.get('spelling_issue'):
-                logger.info(f"Spelling issue detected, not caching: '{llm_result.get('sent_word')}'")
+            if llm_result.get("spelling_issue"):
+                logger.info(
+                    f"Spelling issue detected, not caching: '{llm_result.get('sent_word')}'"
+                )
                 return llm_result  # Pass through the spelling issue response
 
-            if not llm_result.get('success'):
+            if not llm_result.get("success"):
                 # If we have some cached translations, return those with partial error
                 if cached_translations:
                     return {
@@ -313,29 +340,33 @@ def get_or_create_translations(
                         "translations": cached_translations,
                         "cache_status": cache_status,
                         "error": f"LLM failed for {uncached_languages}: {llm_result.get('error')}",
-                        "model": model
+                        "model": model,
                     }
                 else:
                     # No cached translations and LLM failed - complete failure
                     return {
                         "success": False,
-                        "error": llm_result.get('error'),
-                        "phrase_id": phrase.id
+                        "error": llm_result.get("error"),
+                        "phrase_id": phrase.id,
                     }
 
             # Extract fresh translations and cost data
-            fresh_translations = llm_result.get('translations', {})
-            usage_stats = llm_result.get('usage')
-            cost_usd = llm_result.get('cost_usd')
-            new_source_info = llm_result.get('source_info', [text, '', ''])
+            fresh_translations = llm_result.get("translations", {})
+            usage_stats = llm_result.get("usage")
+            cost_usd = llm_result.get("cost_usd")
+            new_source_info = llm_result.get("source_info", [text, "", ""])
 
             # Update phrase with source_info if we got it from LLM and don't have it cached
             if new_source_info and not phrase.source_info_json:
                 phrase.source_info_json = new_source_info
                 source_info = new_source_info  # Use the fresh source_info
-                logger.info(f"Cached source_info for phrase_id={phrase.id}: {new_source_info}")
+                logger.info(
+                    f"Cached source_info for phrase_id={phrase.id}: {new_source_info}"
+                )
             elif new_source_info:
-                source_info = new_source_info  # Use fresh source_info even if we have cached
+                source_info = (
+                    new_source_info  # Use fresh source_info even if we have cached
+                )
 
             # Step 4: Cache new translations with cost data
             for target_lang, target_code in zip(uncached_languages, uncached_codes):
@@ -347,19 +378,29 @@ def get_or_create_translations(
                         target_language_code=target_code,
                         translations_json=translation_data,
                         model_name=model,
-                        model_version=llm_result.get('model'),  # Actual model used
-                        prompt_tokens=usage_stats.get('prompt_tokens', 0) if usage_stats else 0,
-                        completion_tokens=usage_stats.get('completion_tokens', 0) if usage_stats else 0,
-                        total_tokens=usage_stats.get('total_tokens', 0) if usage_stats else 0,
-                        cached_tokens=usage_stats.get('cached_tokens', 0) if usage_stats else 0,
-                        cost_usd=Decimal(str(cost_usd)) if cost_usd else None
+                        model_version=llm_result.get("model"),  # Actual model used
+                        prompt_tokens=usage_stats.get("prompt_tokens", 0)
+                        if usage_stats
+                        else 0,
+                        completion_tokens=usage_stats.get("completion_tokens", 0)
+                        if usage_stats
+                        else 0,
+                        total_tokens=usage_stats.get("total_tokens", 0)
+                        if usage_stats
+                        else 0,
+                        cached_tokens=usage_stats.get("cached_tokens", 0)
+                        if usage_stats
+                        else 0,
+                        cost_usd=Decimal(str(cost_usd)) if cost_usd else None,
                     )
 
             # Step 5: Aggregate cost to session if available
             if session_id and cost_usd:
                 try:
                     add_translation_cost(session_id, Decimal(str(cost_usd)))
-                    logger.info(f"Added translation cost ${cost_usd:.6f} to session {session_id}")
+                    logger.info(
+                        f"Added translation cost ${cost_usd:.6f} to session {session_id}"
+                    )
                 except Exception as e:
                     logger.error(f"Failed to add translation cost to session: {e}")
 
@@ -387,8 +428,9 @@ def get_or_create_translations(
             "native_language": native_language,
             "translations": all_translations,
             "cache_status": cache_status,
-            "source_info": source_info or [text, '', ''],  # Fallback if only cached data
-            "model": model
+            "source_info": source_info
+            or [text, "", ""],  # Fallback if only cached data
+            "model": model,
         }
 
         if usage_stats:
@@ -399,15 +441,11 @@ def get_or_create_translations(
     except Exception as e:
         logger.error(f"Failed to get or create translations: {str(e)}", exc_info=True)
         db.session.rollback()
-        return {
-            "success": False,
-            "error": f"Translation service error: {str(e)}"
-        }
+        return {"success": False, "error": f"Translation service error: {str(e)}"}
 
 
 def invalidate_translation_cache(
-    phrase_id: int,
-    target_language_code: Optional[str] = None
+    phrase_id: int, target_language_code: Optional[str] = None
 ) -> bool:
     """
     Invalidate (delete) cached translations.
@@ -424,10 +462,11 @@ def invalidate_translation_cache(
         if target_language_code:
             # Delete specific translation
             deleted = PhraseTranslation.query.filter_by(
-                phrase_id=phrase_id,
-                target_language_code=target_language_code
+                phrase_id=phrase_id, target_language_code=target_language_code
             ).delete()
-            logger.info(f"Invalidated cache: phrase_id={phrase_id}, target={target_language_code}")
+            logger.info(
+                f"Invalidated cache: phrase_id={phrase_id}, target={target_language_code}"
+            )
         else:
             # Delete all translations for this phrase
             deleted = PhraseTranslation.query.filter_by(phrase_id=phrase_id).delete()
