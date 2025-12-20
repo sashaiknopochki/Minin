@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, setSetupToken } from "@/contexts/AuthContext";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { apiFetch } from "@/lib/api";
 
@@ -33,6 +33,12 @@ export default function Login() {
       const data = await result.json();
 
       if (data.success && data.user) {
+        // Store setup token if provided (for Safari compatibility)
+        if (data.setup_token) {
+          setSetupToken(data.setup_token);
+          console.log("Setup token received for Safari compatibility");
+        }
+
         login(data.user);
         navigate("/");
       } else {

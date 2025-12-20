@@ -101,20 +101,38 @@ def google_signin():
                 )
                 # Don't fail login if session creation fails
 
-            return jsonify(
-                {
-                    "success": True,
-                    "user": {
-                        "id": user.id,
-                        "email": user.email,
-                        "name": user.name,
-                        "picture": picture,
-                        "primary_language_code": user.primary_language_code,
-                        "translator_languages": user.translator_languages,
-                        "quiz_frequency": user.quiz_frequency,
-                    },
-                }
-            ), 200
+            # For Safari compatibility: Generate a one-time setup token for new users
+            # Safari blocks third-party cookies, so we need an alternative for initial setup
+            setup_token = None
+            if not user.primary_language_code or not user.translator_languages:
+                import secrets
+
+                setup_token = secrets.token_urlsafe(32)
+                # Store token temporarily in database for validation
+                user.setup_token = setup_token
+                from models import db
+
+                db.session.commit()
+                logger.info(f"Generated setup token for new user {email}")
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "user": {
+                            "id": user.id,
+                            "email": user.email,
+                            "name": user.name,
+                            "picture": picture,
+                            "primary_language_code": user.primary_language_code,
+                            "translator_languages": user.translator_languages,
+                            "quiz_frequency": user.quiz_frequency,
+                        },
+                        "setup_token": setup_token,  # Token for Safari/browsers blocking cookies
+                    }
+                ),
+                200,
+            )
 
         except ValueError as e:
             # Invalid token
@@ -244,31 +262,51 @@ def update_languages():
     """
     Update user's language preferences.
     Used during onboarding and settings.
+
+    Supports two authentication methods:
+    1. Cookie-based (for browsers that support third-party cookies)
+    2. Token-based (for Safari/browsers that block third-party cookies)
     """
     # Enhanced logging for debugging authentication issues
     logger.info(
         f"Update languages request - Authenticated: {current_user.is_authenticated}"
     )
 
-    if current_user.is_authenticated:
-        logger.info(f"Current user: {current_user.email} (ID: {current_user.id})")
-    else:
+    data = request.get_json()
+    setup_token = data.get("setup_token")
+
+    # Try token-based auth first (for Safari compatibility)
+    user = None
+    if setup_token:
+        logger.info(f"Attempting token-based authentication with setup_token")
+        from models.user import User
+
+        user = User.query.filter_by(setup_token=setup_token).first()
+        if user:
+            logger.info(f"Found user via setup_token: {user.email} (ID: {user.id})")
+        else:
+            logger.warning(f"Invalid or expired setup_token provided")
+
+    # Fall back to cookie-based auth
+    if not user and current_user.is_authenticated:
+        user = current_user
+        logger.info(
+            f"Using cookie-based auth - Current user: {user.email} (ID: {user.id})"
+        )
+    elif not user:
         logger.warning(
             "Update languages called but user not authenticated. Checking session..."
         )
         logger.warning(f"Session data: {dict(session)}")
         logger.warning(f"Request cookies: {request.cookies.keys()}")
-
-    if not current_user.is_authenticated:
         return jsonify({"success": False, "error": "Not authenticated"}), 401
 
     try:
-        data = request.get_json()
         primary_language_code = data.get("primary_language_code")
         translator_languages = data.get("translator_languages")
 
         logger.info(
-            f"Updating languages for user {current_user.email}: primary={primary_language_code}, learning={translator_languages}"
+            f"Updating languages for user {user.email}: primary={primary_language_code}, learning={translator_languages}"
         )
 
         if not primary_language_code:
@@ -288,23 +326,28 @@ def update_languages():
         from models import db
 
         # Update user languages
-        current_user.primary_language_code = primary_language_code
-        current_user.translator_languages = translator_languages
+        user.primary_language_code = primary_language_code
+        user.translator_languages = translator_languages
+
+        # Clear the setup token after successful use (one-time token)
+        if setup_token and user.setup_token:
+            user.setup_token = None
+            logger.info(f"Cleared setup_token for user {user.email}")
 
         db.session.commit()
 
-        logger.info(f"Successfully updated languages for user {current_user.email}")
+        logger.info(f"Successfully updated languages for user {user.email}")
 
         return jsonify(
             {
                 "success": True,
                 "user": {
-                    "id": current_user.id,
-                    "email": current_user.email,
-                    "name": current_user.name,
-                    "primary_language_code": current_user.primary_language_code,
-                    "translator_languages": current_user.translator_languages,
-                    "quiz_frequency": current_user.quiz_frequency,
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.name,
+                    "primary_language_code": user.primary_language_code,
+                    "translator_languages": user.translator_languages,
+                    "quiz_frequency": user.quiz_frequency,
                 },
             }
         ), 200
@@ -312,7 +355,7 @@ def update_languages():
     except Exception as e:
         db.session.rollback()
         logger.exception(
-            f"Exception updating languages for user {current_user.email}: {str(e)}"
+            f"Exception updating languages for user {user.email if user else 'unknown'}: {str(e)}"
         )
         return jsonify({"success": False, "error": "An unexpected error occurred"}), 500
 

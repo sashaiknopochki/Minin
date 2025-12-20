@@ -22,7 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useLanguageContext } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, getSetupToken, setSetupToken } from "@/contexts/AuthContext";
 import { X, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -119,6 +119,9 @@ export default function LanguageSetup() {
     setError(null);
 
     try {
+      // Get setup token for Safari compatibility
+      const token = getSetupToken();
+
       const response = await apiFetch("/auth/update-languages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,12 +129,16 @@ export default function LanguageSetup() {
         body: JSON.stringify({
           primary_language_code: nativeLanguage,
           translator_languages: validLearningLanguages,
+          setup_token: token, // Include token for Safari/browsers blocking cookies
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // Clear the setup token after successful use
+        setSetupToken(null);
+
         // Refresh user data to trigger navigation to HomePage
         await checkAuth();
       } else {

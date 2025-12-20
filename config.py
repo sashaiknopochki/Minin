@@ -54,6 +54,10 @@ class ProductionConfig(Config):
     REMEMBER_COOKIE_SECURE = True
     REMEMBER_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "None")
     REMEMBER_COOKIE_DURATION = 2592000  # 30 days in seconds
+    REMEMBER_COOKIE_PATH = "/"  # Make cookie available for all paths
+
+    # Also ensure session cookie has correct path
+    SESSION_COOKIE_PATH = "/"
 
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": 20,

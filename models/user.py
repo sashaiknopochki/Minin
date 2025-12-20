@@ -1,13 +1,16 @@
-from models import db
+import re
 from datetime import datetime, timezone
+
 from flask_login import UserMixin
 from sqlalchemy.orm import validates
-import re
+
+from models import db
 
 
 class User(UserMixin, db.Model):
     """User model - stores user information and preferences"""
-    __tablename__ = 'users'
+
+    __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -18,7 +21,7 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String)
 
     # Language for quiz responses (supports extended codes like zh-CN)
-    primary_language_code = db.Column(db.String(10), db.ForeignKey('languages.code'))
+    primary_language_code = db.Column(db.String(10), db.ForeignKey("languages.code"))
 
     # Array of language codes e.g. ["en", "de", "ru"]
     translator_languages = db.Column(db.JSON)
@@ -37,40 +40,50 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_active_at = db.Column(db.DateTime)
 
-    # Relationships
-    primary_language = db.relationship('Language', foreign_keys=[primary_language_code])
-    sessions = db.relationship('Session', back_populates='user', lazy='dynamic')
-    user_searches = db.relationship('UserSearch', back_populates='user', lazy='dynamic')
-    learning_progress = db.relationship('UserLearningProgress', back_populates='user', lazy='dynamic')
-    quiz_attempts = db.relationship('QuizAttempt', back_populates='user', lazy='dynamic')
+    # One-time setup token for Safari/browsers that block third-party cookies
+    # Used during initial language setup, cleared after first use
+    setup_token = db.Column(db.String(64), nullable=True)
 
-    @validates('email')
+    # Relationships
+    primary_language = db.relationship("Language", foreign_keys=[primary_language_code])
+    sessions = db.relationship("Session", back_populates="user", lazy="dynamic")
+    user_searches = db.relationship("UserSearch", back_populates="user", lazy="dynamic")
+    learning_progress = db.relationship(
+        "UserLearningProgress", back_populates="user", lazy="dynamic"
+    )
+    quiz_attempts = db.relationship(
+        "QuizAttempt", back_populates="user", lazy="dynamic"
+    )
+
+    @validates("email")
     def validate_email(self, key, email):
         if not email:
-            raise ValueError('Email is required')
+            raise ValueError("Email is required")
         # Basic email format validation
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(pattern, email):
-            raise ValueError(f'Invalid email format: {email}')
+            raise ValueError(f"Invalid email format: {email}")
         return email
 
-    @validates('quiz_frequency')
+    @validates("quiz_frequency")
     def validate_quiz_frequency(self, key, value):
         if value is not None and value < 1:
-            raise ValueError('quiz_frequency must be a positive integer')
+            raise ValueError("quiz_frequency must be a positive integer")
         return value
 
-    @validates('translator_languages')
+    @validates("translator_languages")
     def validate_translator_languages(self, key, languages):
         if languages is None:
             return languages
         if not isinstance(languages, list):
-            raise ValueError('translator_languages must be a list')
+            raise ValueError("translator_languages must be a list")
         for lang in languages:
             # Allow codes up to 10 characters (supports extended codes like zh-CN, zh-TW)
             if not isinstance(lang, str) or len(lang) < 2 or len(lang) > 10:
-                raise ValueError(f'Invalid language code: {lang}. Must be 2-10 characters')
+                raise ValueError(
+                    f"Invalid language code: {lang}. Must be 2-10 characters"
+                )
         return languages
 
     def __repr__(self):
-        return f'<User {self.email}>'
+        return f"<User {self.email}>"

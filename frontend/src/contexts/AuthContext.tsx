@@ -20,6 +20,17 @@ export interface User {
   enable_synonym_quiz: boolean;
 }
 
+// Setup token for Safari/browsers that block third-party cookies
+let setupToken: string | null = null;
+
+export function getSetupToken(): string | null {
+  return setupToken;
+}
+
+export function setSetupToken(token: string | null): void {
+  setupToken = token;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
